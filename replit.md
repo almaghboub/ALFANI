@@ -50,16 +50,23 @@ The system features comprehensive functionality with responsive interface, bilin
   - `useLydExchangeRate` hook for centralized management
   - Dual-currency display (USD/LYD) across dashboards, orders, customers, invoices, and profit reports
   - **Dual Exchange Rate System**: Separate purchase rate (cost to buy USD) and sale rate (price sold to customers) for tracking exchange profit margin
-  - Exchange rates stored in settings table:
+  - Global exchange rates stored in settings table:
     - `lyd_purchase_exchange_rate`: Rate paid to buy USD (default: 4.80)
     - `lyd_exchange_rate` (sale rate): Rate sold to customers (default: 4.85)
-  - **Exchange Rate Profit Calculation**: `(sale_rate - purchase_rate) × total_revenue_USD` displayed only in LYD mode
-  - Per-order LYD exchange rate tracking (stored in `orders.lyd_exchange_rate`)
-  - Settings page UI for managing both purchase and sale exchange rates with bilingual support
-  - Exchange rate profit integrated into:
-    - Profit page metrics with dedicated breakdown card
-    - Financial reports showing separate profit components (items, shipping, exchange rate)
-    - Total profit calculations include exchange rate profit when viewing in LYD
+  - **Per-Order Exchange Rate Tracking (November 4, 2025)**:
+    - Both purchase and sale rates saved per order in `orders.lyd_exchange_rate` and `orders.lyd_purchase_exchange_rate`
+    - Dual exchange rate input fields in new order dialog with auto-population from global settings
+    - Rates can be overridden per-order for real-time accuracy as rates change throughout the day
+    - Historical rate tracking ensures accurate profit calculations even as global rates change
+    - Order details modal displays both rates and calculated exchange profit/loss for each order
+  - **Exchange Rate Profit/Loss Calculation**: `(sale_rate - purchase_rate) × order_total` calculated using per-order rates
+  - Settings page UI for managing both global purchase and sale exchange rates with bilingual support
+  - Exchange rate profit/loss integrated into profit page:
+    - Dedicated line item showing profit (amber/gold) or loss (red) in LYD
+    - USD mode: Shows "$XXX USD ± YYY LYD" to display both profit components
+    - LYD mode: Single combined total including all profit/loss streams
+    - Profit margin note in USD mode explains exclusion of LYD component
+  - Financial reports show separate profit components (items, shipping, exchange rate)
   - Consistent currency conversion: values converted once at calculation level to prevent double-conversion
   - Color-coded LYD amounts with bold blue formatting
   - Locale-aware invoice numbering (Dinar/دينار)
