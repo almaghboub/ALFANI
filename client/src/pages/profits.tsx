@@ -132,10 +132,18 @@ export default function Profits() {
     const totalProfitUSD = filteredOrders.reduce((sum, order) => sum + parseFloat(order.totalProfit || "0"), 0);
     const averageOrderValueUSD = orderCount > 0 ? totalRevenueUSD / orderCount : 0;
     
-    // Calculate exchange rate profit in LYD (only if both rates are set)
-    const exchangeRateProfitLYD = (lydExchangeRate > 0 && lydPurchaseExchangeRate > 0)
-      ? (lydExchangeRate - lydPurchaseExchangeRate) * totalRevenueUSD
-      : 0;
+    // Calculate exchange rate profit in LYD using PER-ORDER exchange rates
+    const exchangeRateProfitLYD = filteredOrders.reduce((sum, order) => {
+      const orderSaleRate = parseFloat(order.lydExchangeRate || "0");
+      const orderPurchaseRate = parseFloat(order.lydPurchaseExchangeRate || "0");
+      const orderTotal = parseFloat(order.totalAmount || "0");
+      
+      // Calculate exchange profit for this order if both rates exist
+      if (orderSaleRate > 0 && orderPurchaseRate > 0) {
+        return sum + ((orderSaleRate - orderPurchaseRate) * orderTotal);
+      }
+      return sum;
+    }, 0);
     
     // Convert to display currency
     const totalRevenue = exchangeRate > 0 ? parseFloat(convertToLYD(totalRevenueUSD)) : totalRevenueUSD;
@@ -211,10 +219,18 @@ export default function Profits() {
       const totalItemsProfitUSD = orders.reduce((sum: number, order: any) => sum + parseFloat(order.itemsProfit || "0"), 0);
       const totalShippingProfitUSD = orders.reduce((sum: number, order: any) => sum + parseFloat(order.shippingProfit || "0"), 0);
       
-      // Calculate exchange rate profit in LYD (only if both rates are set)
-      const exchangeRateProfitLYD = (lydExchangeRate > 0 && lydPurchaseExchangeRate > 0)
-        ? (lydExchangeRate - lydPurchaseExchangeRate) * totalRevenueUSD
-        : 0;
+      // Calculate exchange rate profit in LYD using PER-ORDER exchange rates
+      const exchangeRateProfitLYD = orders.reduce((sum: number, order: any) => {
+        const orderSaleRate = parseFloat(order.lydExchangeRate || "0");
+        const orderPurchaseRate = parseFloat(order.lydPurchaseExchangeRate || "0");
+        const orderTotal = parseFloat(order.total || order.totalAmount || "0");
+        
+        // Calculate exchange profit for this order if both rates exist
+        if (orderSaleRate > 0 && orderPurchaseRate > 0) {
+          return sum + ((orderSaleRate - orderPurchaseRate) * orderTotal);
+        }
+        return sum;
+      }, 0);
       
       // Convert to display currency (LYD or USD)
       const totalRevenue = exchangeRate > 0 ? totalRevenueUSD * exchangeRate : totalRevenueUSD;
