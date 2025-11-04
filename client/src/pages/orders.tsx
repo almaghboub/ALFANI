@@ -125,6 +125,7 @@ export default function Orders() {
   const [calculatingShipping, setCalculatingShipping] = useState(false);
   const [notes, setNotes] = useState("");
   const [orderLydRate, setOrderLydRate] = useState<string>("");
+  const [orderLydPurchaseRate, setOrderLydPurchaseRate] = useState<string>("");
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -140,22 +141,32 @@ export default function Orders() {
   // Use shared LYD exchange rate hook
   const { exchangeRate, convertToLYD } = useLydExchangeRate();
   
+  const { data: settings = [] } = useQuery<Array<{ id: string; key: string; value: string }>>({
+    queryKey: ["/api/settings"],
+  });
+
+  const globalLydExchangeRate = parseFloat(settings.find(s => s.key === 'lyd_exchange_rate')?.value || '0');
+  const globalLydPurchaseExchangeRate = parseFloat(settings.find(s => s.key === 'lyd_purchase_exchange_rate')?.value || '0');
+  
   // Helper to convert using order-specific rate or fall back to global rate
   const convertOrderToLYD = (amount: number, orderRate?: string) => {
     const rate = orderRate ? parseFloat(orderRate) : exchangeRate;
     return rate > 0 ? (amount * rate).toFixed(2) : amount.toFixed(2);
   };
 
-  // Pre-fill order LYD rate when modal first opens
+  // Pre-fill order LYD rates when modal first opens
   useEffect(() => {
-    if (isModalOpen && exchangeRate > 0) {
-      // Only set if orderLydRate hasn't been set (is empty string)
-      // This allows user edits to persist within the same modal session
-      if (!orderLydRate || orderLydRate === "") {
+    if (isModalOpen) {
+      // Pre-fill sale rate (what we charge customer)
+      if (exchangeRate > 0 && (!orderLydRate || orderLydRate === "")) {
         setOrderLydRate(exchangeRate.toString());
       }
+      // Pre-fill purchase rate (what we paid to buy USD)
+      if (globalLydPurchaseExchangeRate > 0 && (!orderLydPurchaseRate || orderLydPurchaseRate === "")) {
+        setOrderLydPurchaseRate(globalLydPurchaseExchangeRate.toString());
+      }
     }
-  }, [isModalOpen, exchangeRate]);
+  }, [isModalOpen, exchangeRate, globalLydPurchaseExchangeRate]);
 
   const { data: customers = [] } = useQuery({
     queryKey: ["/api/customers"],
@@ -172,12 +183,6 @@ export default function Orders() {
       return response.json() as Promise<string[]>;
     },
   });
-
-  const { data: settings = [] } = useQuery<Array<{ id: string; key: string; value: string }>>({
-    queryKey: ["/api/settings"],
-  });
-
-  const globalLydExchangeRate = parseFloat(settings.find(s => s.key === 'lyd_exchange_rate')?.value || '0');
 
   const { data: shippingStaff = [] } = useQuery({
     queryKey: ["/api/shipping-staff"],
@@ -694,6 +699,7 @@ export default function Orders() {
     setNotes("");
     setCustomOrderCode("");
     setOrderLydRate("");
+    setOrderLydPurchaseRate("");
     setNewCustomer({
       firstName: "",
       lastName: "",
@@ -941,6 +947,7 @@ export default function Orders() {
       itemsProfit: itemsProfit.toFixed(2),
       totalProfit: totalProfit.toFixed(2),
       lydExchangeRate: (parseFloat(orderLydRate || "0") > 0 ? parseFloat(orderLydRate || "0") : exchangeRate > 0 ? exchangeRate : undefined)?.toFixed(4),
+      lydPurchaseExchangeRate: (parseFloat(orderLydPurchaseRate || "0") > 0 ? parseFloat(orderLydPurchaseRate || "0") : globalLydPurchaseExchangeRate > 0 ? globalLydPurchaseExchangeRate : undefined)?.toFixed(4),
       notes: finalNotes || undefined,
       orderNumber: customOrderCode || undefined,
     };
@@ -1857,48 +1864,74 @@ export default function Orders() {
                   )}
                 </div>
 
-                <div>
-                  <Label htmlFor="lyd-exchange-rate" className="flex items-center gap-2">
-                    {t('lydExchangeRate')}
-                    {(!lydExchangeRate || lydExchangeRate === "") && shippingWeight !== 1 && (
-                      <span className="text-xs text-orange-600 font-medium animate-pulse">
-                        ← {t('required') || 'Required to see LYD prices'}
-                      </span>
-                    )}
-                  </Label>
-                  <Input
-                    id="lyd-exchange-rate"
-                    type="text"
-                    inputMode="decimal"
-                    value={lydExchangeRate}
-                    onChange={(e) => {
-                      let value = e.target.value.replace(/[^0-9.]/g, '');
-                      const parts = value.split('.');
-                      if (parts.length > 2) {
-                        value = parts[0] + '.' + parts.slice(1).join('');
-                      }
-                      setLydExchangeRate(value);
-                      // Trigger recalculation if shipping was already calculated
-                      if (parseFloat(value || "0") > 0 && shippingCalculation) {
-                        toast({
-                          title: "LYD Calculation Updated",
-                          description: `Shipping: ${(calculateTotals().shippingCost * parseFloat(value)).toFixed(2)} LYD | Total: ${(calculateTotals().total * parseFloat(value)).toFixed(2)} LYD`,
-                          duration: 3000,
-                        });
-                      }
-                    }}
-                    placeholder={t('enterLydRate')}
-                    required
-                    className={(!lydExchangeRate || lydExchangeRate === "") && shippingWeight !== 1 ? "border-orange-400 border-2 animate-pulse" : ""}
-                    data-testid="input-lyd-exchange-rate"
-                  />
-                  {parseFloat(lydExchangeRate || "0") > 0 && shippingCalculation && (
-                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950 rounded text-sm">
-                      <div className="font-medium text-blue-900 dark:text-blue-100">
-                        Shipping in LYD: {(calculateTotals().shippingCost * parseFloat(lydExchangeRate || "0")).toFixed(2)} LYD
+                {/* LYD Exchange Rates Section */}
+                <div className="space-y-4 border rounded-lg p-4 bg-blue-50/50 dark:bg-blue-950/20">
+                  <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100">LYD Exchange Rates for this Order</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="order-lyd-sale-rate" className="text-sm">
+                        Sale Rate (Customer Pays) *
+                        <span className="text-xs text-muted-foreground block mt-0.5">What you charge customer</span>
+                      </Label>
+                      <Input
+                        id="order-lyd-sale-rate"
+                        type="text"
+                        inputMode="decimal"
+                        value={orderLydRate}
+                        onChange={(e) => {
+                          let value = e.target.value.replace(/[^0-9.]/g, '');
+                          const parts = value.split('.');
+                          if (parts.length > 2) {
+                            value = parts[0] + '.' + parts.slice(1).join('');
+                          }
+                          setOrderLydRate(value);
+                        }}
+                        placeholder="e.g., 4.85"
+                        required
+                        data-testid="input-lyd-sale-rate"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="order-lyd-purchase-rate" className="text-sm">
+                        Purchase Rate (You Paid) *
+                        <span className="text-xs text-muted-foreground block mt-0.5">What you paid to buy USD</span>
+                      </Label>
+                      <Input
+                        id="order-lyd-purchase-rate"
+                        type="text"
+                        inputMode="decimal"
+                        value={orderLydPurchaseRate}
+                        onChange={(e) => {
+                          let value = e.target.value.replace(/[^0-9.]/g, '');
+                          const parts = value.split('.');
+                          if (parts.length > 2) {
+                            value = parts[0] + '.' + parts.slice(1).join('');
+                          }
+                          setOrderLydPurchaseRate(value);
+                        }}
+                        placeholder="e.g., 4.80"
+                        required
+                        data-testid="input-lyd-purchase-rate"
+                      />
+                    </div>
+                  </div>
+                  {parseFloat(orderLydRate || "0") > 0 && parseFloat(orderLydPurchaseRate || "0") > 0 && (
+                    <div className="p-2 bg-green-50 dark:bg-green-950/50 rounded text-sm border border-green-200 dark:border-green-800">
+                      <div className="font-medium text-green-900 dark:text-green-100">
+                        Exchange Profit: {((parseFloat(orderLydRate) - parseFloat(orderLydPurchaseRate)) * calculateTotals().total).toFixed(2)} LYD
                       </div>
-                      <div className="text-xs text-blue-700 dark:text-blue-300">
-                        Total Order: {(calculateTotals().total * parseFloat(lydExchangeRate || "0")).toFixed(2)} LYD
+                      <div className="text-xs text-green-700 dark:text-green-300 mt-1">
+                        Per USD: {(parseFloat(orderLydRate) - parseFloat(orderLydPurchaseRate)).toFixed(4)} LYD
+                      </div>
+                    </div>
+                  )}
+                  {parseFloat(orderLydRate || "0") > 0 && shippingCalculation && (
+                    <div className="p-2 bg-blue-50 dark:bg-blue-950/50 rounded text-sm border border-blue-200 dark:border-blue-800">
+                      <div className="font-medium text-blue-900 dark:text-blue-100">
+                        Total Order in LYD: {(calculateTotals().total * parseFloat(orderLydRate || "0")).toFixed(2)} LYD
+                      </div>
+                      <div className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                        Shipping: {(calculateTotals().shippingCost * parseFloat(orderLydRate || "0")).toFixed(2)} LYD
                       </div>
                     </div>
                   )}
