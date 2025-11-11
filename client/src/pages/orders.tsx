@@ -3060,6 +3060,62 @@ export default function Orders() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+
+      {/* Print Styles - Hide everything except invoice when printing */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @media print {
+            /* Hide everything by default */
+            body > *:not(.invoice-container) {
+              display: none !important;
+            }
+            
+            /* Hide dialog overlay and backdrop */
+            [role="dialog"],
+            [data-radix-portal],
+            .fixed.inset-0 {
+              background: transparent !important;
+              box-shadow: none !important;
+            }
+            
+            /* Hide dialog chrome (headers, buttons, close buttons) */
+            [data-testid="modal-print-invoice"] > div:first-child,
+            button,
+            .DialogHeader,
+            [class*="DialogHeader"] {
+              display: none !important;
+            }
+            
+            /* Show only the invoice container */
+            .invoice-container {
+              display: block !important;
+              position: static !important;
+              width: 100% !important;
+              max-width: 100% !important;
+              margin: 0 !important;
+              padding: 20px !important;
+              background: white !important;
+              box-shadow: none !important;
+            }
+            
+            /* Make dialog content transparent and full-width */
+            [data-testid="modal-print-invoice"] {
+              position: static !important;
+              max-width: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+            }
+            
+            /* Ensure body has white background */
+            body {
+              background: white !important;
+            }
+          }
+        `
+      }} />
     </div>
   );
 }
