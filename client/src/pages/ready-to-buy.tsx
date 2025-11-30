@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -109,12 +108,10 @@ export default function ReadyToBuy() {
     },
   });
 
-  const handleMarkAsBought = (order: OrderWithCustomer, checked: boolean) => {
-    if (checked) {
-      setPendingAction({ type: 'mark_bought', order });
-      setOrderIdInput("");
-      setIsOrderIdDialogOpen(true);
-    }
+  const handleMarkAsBought = (order: OrderWithCustomer) => {
+    setPendingAction({ type: 'mark_bought', order });
+    setOrderIdInput("");
+    setIsOrderIdDialogOpen(true);
   };
 
   const handleEditOrder = (order: OrderWithCustomer) => {
@@ -269,7 +266,7 @@ export default function ReadyToBuy() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[100px]">{t('bought')}</TableHead>
+                      <TableHead className="w-[100px]">{t('action')}</TableHead>
                       <TableHead>{t('orderNumber')}</TableHead>
                       <TableHead>{t('customer')}</TableHead>
                       <TableHead>{t('customerCode')}</TableHead>
@@ -285,11 +282,16 @@ export default function ReadyToBuy() {
                     {filteredOrders.map((order) => (
                       <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
                         <TableCell>
-                          <Checkbox
-                            onCheckedChange={(checked) => handleMarkAsBought(order, checked as boolean)}
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => handleMarkAsBought(order)}
                             disabled={markAsProcessingMutation.isPending}
-                            data-testid={`checkbox-bought-${order.id}`}
-                          />
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            data-testid={`button-buy-${order.id}`}
+                          >
+                            {t('buy')}
+                          </Button>
                         </TableCell>
                         <TableCell className="font-medium">
                           {order.orderNumber}
