@@ -44,6 +44,8 @@ export const orders = pgTable("orders", {
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   downPayment: decimal("down_payment", { precision: 10, scale: 2 }).notNull().default("0"),
   downPaymentCurrency: currencyEnum("down_payment_currency").notNull().default("USD"),
+  shippingDownPayment: decimal("shipping_down_payment", { precision: 10, scale: 2 }).notNull().default("0"),
+  shippingDownPaymentCurrency: currencyEnum("shipping_down_payment_currency").notNull().default("USD"),
   remainingBalance: decimal("remaining_balance", { precision: 10, scale: 2 }).notNull().default("0"),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).notNull().default("0"),
   shippingWeight: decimal("shipping_weight", { precision: 10, scale: 2 }).notNull().default("1"),

@@ -113,6 +113,8 @@ export default function Orders() {
   const [hasDownPayment, setHasDownPayment] = useState(false);
   const [downPayment, setDownPayment] = useState("");
   const [downPaymentCurrency, setDownPaymentCurrency] = useState<"USD" | "LYD">("USD");
+  const [shippingDownPayment, setShippingDownPayment] = useState("");
+  const [shippingDownPaymentCurrency, setShippingDownPaymentCurrency] = useState<"USD" | "LYD">("USD");
   const [lydExchangeRate, setLydExchangeRate] = useState<string>("");
   const [hasPromptedForLydRate, setHasPromptedForLydRate] = useState(false);
   const [shippingCalculation, setShippingCalculation] = useState<{
@@ -691,6 +693,8 @@ export default function Orders() {
     setClothingSize("");
     setDownPayment("");
     setDownPaymentCurrency("USD");
+    setShippingDownPayment("");
+    setShippingDownPaymentCurrency("USD");
     setLydExchangeRate("");
     setAssignAfterCreate(false);
     setSelectedShippingStaffId("");
@@ -908,6 +912,12 @@ export default function Orders() {
       ? downPaymentValue / rate 
       : downPaymentValue;
     
+    // Parse shipping down payment and convert to USD if needed
+    const shippingDownPaymentValue = parseFloat(shippingDownPayment || "0");
+    const shippingDownPaymentUSD = shippingDownPaymentCurrency === "LYD" && rate > 0 
+      ? shippingDownPaymentValue / rate 
+      : shippingDownPaymentValue;
+    
     // Validate down payment doesn't exceed total
     if (downPaymentUSD > totals.total) {
       toast({
@@ -938,6 +948,8 @@ export default function Orders() {
       totalAmount: totals.total.toFixed(2),
       downPayment: downPaymentUSD.toFixed(2),
       downPaymentCurrency: downPaymentCurrency,
+      shippingDownPayment: shippingDownPaymentUSD.toFixed(2),
+      shippingDownPaymentCurrency: shippingDownPaymentCurrency,
       remainingBalance: remainingBalance.toFixed(2),
       shippingCost: totals.shippingCost.toFixed(2),
       shippingWeight: shippingWeight.toFixed(2),
@@ -1602,15 +1614,15 @@ export default function Orders() {
                     {orderItems.map((item, index) => (
                       <div key={index} className="border rounded-lg p-4 bg-muted/30" data-testid={`order-item-${index}`}>
                         <div className="space-y-4">
-                          {/* First row: Shipping Code, Product Code */}
+                          {/* First row: Tracking Number, Product Code */}
                           <div className="grid grid-cols-12 gap-4">
                             <div className="col-span-11">
-                              <Label htmlFor={`product-name-${index}`}>Shipping Code (Optional)</Label>
+                              <Label htmlFor={`product-name-${index}`}>{t('trackingNumber')} ({t('optional')})</Label>
                               <Input
                                 id={`product-name-${index}`}
                                 value={item.productName}
                                 onChange={(e) => updateOrderItem(index, "productName", e.target.value)}
-                                placeholder={t('enterShippingCode')}
+                                placeholder={t('enterTrackingNumber') || 'Enter tracking number'}
                                 data-testid={`input-product-name-${index}`}
                               />
                             </div>
@@ -2088,6 +2100,65 @@ export default function Orders() {
                               }
                             })()}
                           </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Shipping Down Payment Section */}
+                    <div className="border-t pt-3 space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="has-shipping-down-payment"
+                          checked={parseFloat(shippingDownPayment || "0") > 0}
+                          onChange={(e) => {
+                            if (!e.target.checked) {
+                              setShippingDownPayment("");
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-gray-300"
+                          data-testid="checkbox-has-shipping-down-payment"
+                        />
+                        <Label htmlFor="has-shipping-down-payment" className="text-sm font-medium cursor-pointer">
+                          {t('hasShippingDownPayment') || 'Shipping Down Payment?'}
+                        </Label>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="shipping-down-payment-currency" className="text-sm">{t('currency') || 'Currency'}</Label>
+                        <select
+                          id="shipping-down-payment-currency"
+                          value={shippingDownPaymentCurrency}
+                          onChange={(e) => setShippingDownPaymentCurrency(e.target.value as "USD" | "LYD")}
+                          className="w-full px-3 py-2 border rounded-md bg-background"
+                          data-testid="select-shipping-down-payment-currency"
+                        >
+                          <option value="USD">USD ($)</option>
+                          <option value="LYD">LYD (د.ل)</option>
+                        </select>
+                        <Label htmlFor="shipping-down-payment" className="text-sm">
+                          {t('shippingDownPaymentAmount') || 'Shipping Down Payment Amount'} ({shippingDownPaymentCurrency})
+                        </Label>
+                        <Input
+                          id="shipping-down-payment"
+                          type="text"
+                          inputMode="decimal"
+                          value={shippingDownPayment}
+                          onChange={(e) => {
+                            let value = e.target.value.replace(/[^0-9.]/g, '');
+                            const parts = value.split('.');
+                            if (parts.length > 2) {
+                              value = parts[0] + '.' + parts.slice(1).join('');
+                            }
+                            setShippingDownPayment(value);
+                          }}
+                          placeholder="0.00"
+                          className="mt-1"
+                          data-testid="input-shipping-down-payment"
+                        />
+                      </div>
+                      {parseFloat(shippingDownPayment || "0") > 0 && (
+                        <div className="text-sm text-blue-600 bg-blue-50 dark:bg-blue-950 p-2 rounded">
+                          {t('shippingDownPaymentNote') || 'Shipping down payment will be recorded separately from item down payment.'}
                         </div>
                       )}
                     </div>

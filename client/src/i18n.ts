@@ -959,6 +959,23 @@ const resources = {
       failedDeleteExpense: "Failed to delete expense",
       selectCategoryAndAmount: "Please select a category and enter an amount",
       adding: "Adding...",
+      
+      // Ready to Buy - Order ID Verification
+      enterOrderId: "Enter Order ID",
+      enterOrderIdDescription: "Please enter the Order ID to proceed with this action",
+      orderIdDoesNotMatch: "Order ID does not match",
+      verify: "Verify",
+      enterOrderNumber: "Enter order number",
+      
+      // Shipping Down Payment
+      hasShippingDownPayment: "Shipping Down Payment?",
+      shippingDownPaymentAmount: "Shipping Down Payment Amount",
+      shippingDownPaymentNote: "Shipping down payment will be recorded separately from item down payment.",
+      
+      // Edit Order
+      editOrder: "Edit Order",
+      orderUpdatedSuccessfully: "Order updated successfully",
+      failedToUpdateOrder: "Failed to update order",
     }
   },
   ar: {
@@ -1916,6 +1933,23 @@ const resources = {
       failedDeleteExpense: "فشل في حذف المصروف",
       selectCategoryAndAmount: "الرجاء اختيار فئة وإدخال المبلغ",
       adding: "جارٍ الإضافة...",
+      
+      // Ready to Buy - Order ID Verification
+      enterOrderId: "أدخل رقم الطلب",
+      enterOrderIdDescription: "الرجاء إدخال رقم الطلب للمتابعة في هذا الإجراء",
+      orderIdDoesNotMatch: "رقم الطلب غير متطابق",
+      verify: "تحقق",
+      enterOrderNumber: "أدخل رقم الطلب",
+      
+      // Shipping Down Payment
+      hasShippingDownPayment: "هل يوجد دفعة شحن أولى؟",
+      shippingDownPaymentAmount: "مبلغ الدفعة الأولى للشحن",
+      shippingDownPaymentNote: "سيتم تسجيل الدفعة الأولى للشحن بشكل منفصل عن دفعة المنتجات.",
+      
+      // Edit Order
+      editOrder: "تعديل الطلب",
+      orderUpdatedSuccessfully: "تم تحديث الطلب بنجاح",
+      failedToUpdateOrder: "فشل في تحديث الطلب",
     }
   }
 };

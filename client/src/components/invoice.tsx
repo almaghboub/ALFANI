@@ -328,7 +328,23 @@ export function Invoice({ order, lydExchangeRate = 0, onPrint }: InvoiceProps) {
       <style dangerouslySetInnerHTML={{
         __html: `
           @media print {
+            /* Hide EVERYTHING on the page first */
+            body * {
+              visibility: hidden !important;
+            }
+            
+            /* Then show only the invoice and its children */
+            .invoice-container,
+            .invoice-container * {
+              visibility: visible !important;
+            }
+            
+            /* Position invoice at top-left of page */
             .invoice-container {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
               max-width: none !important;
               margin: 0 !important;
               padding: 20px !important;
@@ -336,12 +352,55 @@ export function Invoice({ order, lydExchangeRate = 0, onPrint }: InvoiceProps) {
               box-shadow: none !important;
             }
             
-            body {
-              background: white !important;
+            /* Hide dialog backdrop and modal chrome */
+            [role="dialog"],
+            [data-radix-dialog-overlay],
+            .fixed,
+            header,
+            nav,
+            aside,
+            footer,
+            button,
+            .sidebar,
+            .navbar,
+            [data-sidebar] {
+              display: none !important;
+              visibility: hidden !important;
             }
             
-            * {
-              color: black !important;
+            /* Ensure invoice container stays visible even if parent is dialog */
+            .invoice-container {
+              display: block !important;
+              visibility: visible !important;
+            }
+            
+            body {
+              background: white !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            
+            /* Prevent color override for invoice elements */
+            .invoice-container * {
+              color: inherit !important;
+            }
+            
+            .invoice-container .text-gray-600,
+            .invoice-container .text-gray-500 {
+              color: #4b5563 !important;
+            }
+            
+            .invoice-container .text-green-600 {
+              color: #059669 !important;
+            }
+            
+            .invoice-container .text-orange-600 {
+              color: #ea580c !important;
+            }
+            
+            .invoice-container .text-blue-800,
+            .invoice-container .text-blue-900 {
+              color: #1e40af !important;
             }
             
             .bg-gray-50 {
@@ -352,6 +411,12 @@ export function Invoice({ order, lydExchangeRate = 0, onPrint }: InvoiceProps) {
             
             .bg-blue-50 {
               background: #eff6ff !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            
+            .bg-amber-50 {
+              background: #fffbeb !important;
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
             }
@@ -382,6 +447,10 @@ export function Invoice({ order, lydExchangeRate = 0, onPrint }: InvoiceProps) {
               border-color: #3b82f6 !important;
             }
             
+            .border-amber-500 {
+              border-color: #f59e0b !important;
+            }
+            
             .border-gray-200,
             .border-gray-300,
             .border-gray-400 {
@@ -400,6 +469,11 @@ export function Invoice({ order, lydExchangeRate = 0, onPrint }: InvoiceProps) {
               max-height: 80px !important;
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
+            }
+            
+            @page {
+              margin: 0.5in;
+              size: A4;
             }
           }
         `
