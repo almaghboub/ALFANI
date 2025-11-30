@@ -166,6 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
+        console.error("User validation error:", result.error.errors);
         return res.status(400).json({ message: "Invalid user data", errors: result.error.errors });
       }
 
@@ -177,8 +178,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { password, ...safeUser } = user;
       res.status(201).json(safeUser);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to create user" });
+    } catch (error: any) {
+      console.error("User creation error:", error);
+      res.status(500).json({ message: "Failed to create user", error: error?.message || "Unknown error" });
     }
   });
 
@@ -383,8 +385,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orders = await storage.getAllOrders();
       res.json(orders);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch orders" });
+    } catch (error: any) {
+      console.error("Failed to fetch orders:", error);
+      res.status(500).json({ message: "Failed to fetch orders", error: error?.message });
     }
   });
 
