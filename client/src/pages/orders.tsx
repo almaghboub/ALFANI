@@ -2219,7 +2219,7 @@ export default function Orders() {
                         <SelectContent>
                           {shippingStaff.map((staff: any) => (
                             <SelectItem key={staff.id} value={staff.id}>
-                              {staff.name}
+                              {staff.firstName} {staff.lastName}
                             </SelectItem>
                           ))}
                         </SelectContent>
