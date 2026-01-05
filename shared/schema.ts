@@ -9,6 +9,207 @@ export const taskStatusEnum = pgEnum("task_status", ["pending", "completed", "to
 export const taskTypeEnum = pgEnum("task_type", ["task", "delivery", "pickup", "receive_payment"]);
 export const expenseCategoryEnum = pgEnum("expense_category", ["employee_salaries", "supplier_expenses", "marketing_commission", "rent", "cleaning_salaries", "other"]);
 export const currencyEnum = pgEnum("currency", ["USD", "LYD"]);
+export const accountTypeEnum = pgEnum("account_type", ["debit", "credit"]);
+export const transactionTypeEnum = pgEnum("transaction_type", ["deposit", "withdrawal", "transfer", "settlement", "currency_adjustment"]);
+export const receiptTypeEnum = pgEnum("receipt_type", ["payment", "collection"]);
+
+// ============ FINANCIAL MODULES ============
+
+// Revenue Accounts (Main and Sub)
+export const revenueAccounts = pgTable("revenue_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  parentId: varchar("parent_id").references((): any => revenueAccounts.id),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Safes (Cash Boxes) - Multi-Level & Multi-Currency
+export const safes = pgTable("safes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  parentId: varchar("parent_id").references((): any => safes.id),
+  currency: text("currency").notNull().default("USD"),
+  isMultiCurrency: boolean("is_multi_currency").notNull().default(false),
+  balanceUSD: decimal("balance_usd", { precision: 15, scale: 2 }).notNull().default("0"),
+  balanceLYD: decimal("balance_lyd", { precision: 15, scale: 2 }).notNull().default("0"),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Safe Transactions
+export const safeTransactions = pgTable("safe_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  safeId: varchar("safe_id").notNull().references(() => safes.id),
+  type: transactionTypeEnum("type").notNull(),
+  amountUSD: decimal("amount_usd", { precision: 15, scale: 2 }).notNull().default("0"),
+  amountLYD: decimal("amount_lyd", { precision: 15, scale: 2 }).notNull().default("0"),
+  exchangeRate: decimal("exchange_rate", { precision: 10, scale: 4 }),
+  description: text("description"),
+  referenceType: text("reference_type"),
+  referenceId: varchar("reference_id"),
+  createdByUserId: varchar("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Banks
+export const banks = pgTable("banks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  accountNumber: text("account_number"),
+  currency: text("currency").notNull().default("USD"),
+  balanceUSD: decimal("balance_usd", { precision: 15, scale: 2 }).notNull().default("0"),
+  balanceLYD: decimal("balance_lyd", { precision: 15, scale: 2 }).notNull().default("0"),
+  linkedSafeId: varchar("linked_safe_id").references(() => safes.id),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Bank Transactions
+export const bankTransactions = pgTable("bank_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bankId: varchar("bank_id").notNull().references(() => banks.id),
+  type: transactionTypeEnum("type").notNull(),
+  amountUSD: decimal("amount_usd", { precision: 15, scale: 2 }).notNull().default("0"),
+  amountLYD: decimal("amount_lyd", { precision: 15, scale: 2 }).notNull().default("0"),
+  exchangeRate: decimal("exchange_rate", { precision: 10, scale: 4 }),
+  description: text("description"),
+  referenceType: text("reference_type"),
+  referenceId: varchar("reference_id"),
+  createdByUserId: varchar("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Currency Difference Settlements
+export const currencySettlements = pgTable("currency_settlements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  safeId: varchar("safe_id").references(() => safes.id),
+  bankId: varchar("bank_id").references(() => banks.id),
+  previousExchangeRate: decimal("previous_exchange_rate", { precision: 10, scale: 4 }).notNull(),
+  newExchangeRate: decimal("new_exchange_rate", { precision: 10, scale: 4 }).notNull(),
+  previousValueLYD: decimal("previous_value_lyd", { precision: 15, scale: 2 }).notNull(),
+  newValueLYD: decimal("new_value_lyd", { precision: 15, scale: 2 }).notNull(),
+  differenceAmount: decimal("difference_amount", { precision: 15, scale: 2 }).notNull(),
+  isGain: boolean("is_gain").notNull(),
+  notes: text("notes"),
+  createdByUserId: varchar("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Warehouses
+export const warehouses = pgTable("warehouses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  parentId: varchar("parent_id").references((): any => warehouses.id),
+  location: text("location"),
+  linkedSafeId: varchar("linked_safe_id").references(() => safes.id),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Warehouse Stock (for average cost calculation)
+export const warehouseStock = pgTable("warehouse_stock", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  warehouseId: varchar("warehouse_id").notNull().references(() => warehouses.id),
+  productName: text("product_name").notNull(),
+  productCode: text("product_code"),
+  quantity: integer("quantity").notNull().default(0),
+  totalCost: decimal("total_cost", { precision: 15, scale: 2 }).notNull().default("0"),
+  averageCost: decimal("average_cost", { precision: 15, scale: 4 }).notNull().default("0"),
+  lastPurchasePrice: decimal("last_purchase_price", { precision: 15, scale: 2 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Suppliers
+export const suppliers = pgTable("suppliers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  phone: text("phone"),
+  email: text("email"),
+  address: text("address"),
+  balanceOwed: decimal("balance_owed", { precision: 15, scale: 2 }).notNull().default("0"),
+  currency: text("currency").notNull().default("USD"),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Receipts (Payment & Collection)
+export const receipts = pgTable("receipts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  receiptNumber: text("receipt_number").notNull().unique(),
+  type: receiptTypeEnum("type").notNull(),
+  customerId: varchar("customer_id").references(() => customers.id),
+  supplierId: varchar("supplier_id").references(() => suppliers.id),
+  safeId: varchar("safe_id").references(() => safes.id),
+  bankId: varchar("bank_id").references(() => banks.id),
+  amountUSD: decimal("amount_usd", { precision: 15, scale: 2 }).notNull().default("0"),
+  amountLYD: decimal("amount_lyd", { precision: 15, scale: 2 }).notNull().default("0"),
+  exchangeRate: decimal("exchange_rate", { precision: 10, scale: 4 }),
+  currency: text("currency").notNull().default("USD"),
+  description: text("description"),
+  createdByUserId: varchar("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Accounting Entries (Audit Trail)
+export const accountingEntries = pgTable("accounting_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entryNumber: text("entry_number").notNull(),
+  date: timestamp("date").notNull().defaultNow(),
+  description: text("description").notNull(),
+  debitAccountType: text("debit_account_type").notNull(),
+  debitAccountId: varchar("debit_account_id").notNull(),
+  creditAccountType: text("credit_account_type").notNull(),
+  creditAccountId: varchar("credit_account_id").notNull(),
+  amountUSD: decimal("amount_usd", { precision: 15, scale: 2 }).notNull().default("0"),
+  amountLYD: decimal("amount_lyd", { precision: 15, scale: 2 }).notNull().default("0"),
+  exchangeRate: decimal("exchange_rate", { precision: 10, scale: 4 }),
+  referenceType: text("reference_type"),
+  referenceId: varchar("reference_id"),
+  createdByUserId: varchar("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Main Office Account
+export const mainOfficeAccount = pgTable("main_office_account", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().default("Main Office"),
+  totalAssets: decimal("total_assets", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalLiabilities: decimal("total_liabilities", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalRevenue: decimal("total_revenue", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalExpenses: decimal("total_expenses", { precision: 15, scale: 2 }).notNull().default("0"),
+  lastReconciliationDate: timestamp("last_reconciliation_date"),
+  notes: text("notes"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// User Permissions (Extended)
+export const userPermissions = pgTable("user_permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  permission: text("permission").notNull(),
+  isGranted: boolean("is_granted").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// ============ END FINANCIAL MODULES ============
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -33,6 +234,7 @@ export const customers = pgTable("customers", {
   country: text("country"),
   postalCode: text("postal_code"),
   shippingCode: text("shipping_code"),
+  balanceOwed: decimal("balance_owed", { precision: 15, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -61,6 +263,7 @@ export const orders = pgTable("orders", {
   trackingNumber: text("tracking_number"),
   darbAssabilOrderId: text("darb_assabil_order_id"),
   darbAssabilReference: text("darb_assabil_reference"),
+  revenueAccountId: varchar("revenue_account_id").references(() => revenueAccounts.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -229,6 +432,74 @@ export const insertExpenseSchema = createInsertSchema(expenses).omit({
   createdAt: true,
 });
 
+// Financial Module Insert Schemas
+export const insertRevenueAccountSchema = createInsertSchema(revenueAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSafeSchema = createInsertSchema(safes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSafeTransactionSchema = createInsertSchema(safeTransactions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertBankSchema = createInsertSchema(banks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertBankTransactionSchema = createInsertSchema(bankTransactions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCurrencySettlementSchema = createInsertSchema(currencySettlements).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWarehouseSchema = createInsertSchema(warehouses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWarehouseStockSchema = createInsertSchema(warehouseStock).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertReceiptSchema = createInsertSchema(receipts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAccountingEntrySchema = createInsertSchema(accountingEntries).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserPermissionSchema = createInsertSchema(userPermissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Login schema
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -268,6 +539,45 @@ export type DeliveryTask = typeof deliveryTasks.$inferSelect;
 
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type Expense = typeof expenses.$inferSelect;
+
+// Financial Module Types
+export type InsertRevenueAccount = z.infer<typeof insertRevenueAccountSchema>;
+export type RevenueAccount = typeof revenueAccounts.$inferSelect;
+
+export type InsertSafe = z.infer<typeof insertSafeSchema>;
+export type Safe = typeof safes.$inferSelect;
+
+export type InsertSafeTransaction = z.infer<typeof insertSafeTransactionSchema>;
+export type SafeTransaction = typeof safeTransactions.$inferSelect;
+
+export type InsertBank = z.infer<typeof insertBankSchema>;
+export type Bank = typeof banks.$inferSelect;
+
+export type InsertBankTransaction = z.infer<typeof insertBankTransactionSchema>;
+export type BankTransaction = typeof bankTransactions.$inferSelect;
+
+export type InsertCurrencySettlement = z.infer<typeof insertCurrencySettlementSchema>;
+export type CurrencySettlement = typeof currencySettlements.$inferSelect;
+
+export type InsertWarehouse = z.infer<typeof insertWarehouseSchema>;
+export type Warehouse = typeof warehouses.$inferSelect;
+
+export type InsertWarehouseStock = z.infer<typeof insertWarehouseStockSchema>;
+export type WarehouseStock = typeof warehouseStock.$inferSelect;
+
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+export type Supplier = typeof suppliers.$inferSelect;
+
+export type InsertReceipt = z.infer<typeof insertReceiptSchema>;
+export type Receipt = typeof receipts.$inferSelect;
+
+export type InsertAccountingEntry = z.infer<typeof insertAccountingEntrySchema>;
+export type AccountingEntry = typeof accountingEntries.$inferSelect;
+
+export type InsertUserPermission = z.infer<typeof insertUserPermissionSchema>;
+export type UserPermission = typeof userPermissions.$inferSelect;
+
+export type MainOfficeAccountType = typeof mainOfficeAccount.$inferSelect;
 
 export type LoginCredentials = z.infer<typeof loginSchema>;
 

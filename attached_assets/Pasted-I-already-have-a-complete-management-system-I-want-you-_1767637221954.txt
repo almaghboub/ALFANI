@@ -1,0 +1,149 @@
+I already have a complete management system.
+I want you to extend the system by adding the following financial and accounting features without breaking existing functionality or data.
+Do not rebuild the system from scratch. Add new features only.
+
+⸻
+
+1. Revenue Accounts & Revenue Settlement
+
+Add a Revenue module that supports:
+	•	Main revenue accounts
+	•	Unlimited sub-revenue accounts
+	•	Ability to settle and group sub-revenues under a main revenue account
+	•	Each sales invoice must be linked to a specific revenue account
+	•	Allow revenue reconciliation and reporting per main and sub account
+
+⸻
+
+2. Safes (Cash Boxes) – Multi-Level & Multi-Currency
+
+Add a Safe Management module with the following structure:
+	•	Main Safe (parent)
+	•	Multiple sub-safes under each main safe
+	•	Each safe may operate in a single currency or multiple currencies
+
+For multi-currency safes:
+	•	Allow entering:
+	•	Amount in USD
+	•	Exchange rate at purchase time
+	•	Equivalent value in local currency (LYD)
+	•	Store balances in both original currency and base currency
+
+⸻
+
+3. Banks Module (All Currencies)
+
+Add a Banks module:
+	•	Banks can operate in any currency
+	•	Support deposits, withdrawals, and transfers
+	•	Each bank transaction must be recorded as an accounting entry
+	•	Banks can be linked to safes
+
+⸻
+
+4. Currency Difference Settlement
+
+Add a Currency Difference Settlement feature with a dedicated icon:
+	•	Used when exchange rates change
+	•	System must:
+	•	Recalculate the real value of a safe in base currency
+	•	Compare it with the stored book value
+	•	Record the difference as:
+	•	Currency gain, or
+	•	Currency loss
+	•	Do not directly edit balances
+	•	All adjustments must be recorded as accounting entries
+
+⸻
+
+5. Sales Invoices – Average Cost Logic
+
+Update sales invoice cost calculation:
+	•	Cost must be calculated using average cost of the remaining stock
+	•	Do NOT use total historical purchase value
+	•	Average cost must be based on:
+	•	Remaining quantity in the warehouse
+	•	Average purchase price of that remaining stock
+	•	Profit calculation must be accurate per invoice
+	•	Existing invoices must remain unchanged
+
+⸻
+
+6. Warehouses
+
+Add warehouse structure:
+	•	Main warehouse for the office
+	•	Sub-warehouses if needed
+	•	Warehouse stock is the source for average cost calculations
+	•	Each warehouse is linked to accounting and safes
+
+⸻
+
+7. Receipts (Payment & Collection)
+
+Add:
+	•	Payment Receipts
+	•	Collection Receipts
+
+Receipts must:
+	•	Support multiple currencies
+	•	Be linked to:
+	•	Customers
+	•	Suppliers
+	•	Safes
+	•	Banks
+	•	Automatically settle outstanding balances
+
+⸻
+
+8. Debit & Credit Accounts
+
+Add two clear account sections:
+	•	Debit Accounts (Accounts Receivable)
+	•	Credit Accounts (Accounts Payable)
+
+Rules:
+	•	Customers with unpaid invoices appear under Debit Accounts
+	•	Suppliers with unpaid balances appear under Credit Accounts
+	•	Balances must update automatically after receipts
+
+⸻
+
+9. Customers Without Down Payment
+
+Add an option to:
+	•	Create customer accounts without advance payment
+	•	Allow selling on credit
+	•	Automatically record the amount as a debit balance
+	•	Settle later via collection receipts
+
+⸻
+
+10. Main Office Account
+
+Add a Main Office Account:
+	•	Used as a central financial reference
+	•	Can consolidate safes, banks, warehouses, and revenues
+	•	Used for reporting and reconciliation
+
+⸻
+
+11. Permissions & Roles
+
+Extend permission system to include:
+	•	Currency adjustment permission
+	•	Exchange rate modification
+	•	Safe reconciliation
+	•	Invoice approval
+	•	Financial reporting access
+
+Each role must have customizable access.
+
+⸻
+
+GENERAL RULES
+	•	Do NOT remove or modify existing data
+	•	Do NOT change current workflows unless required
+	•	All financial actions must be traceable and auditable
+	•	Every financial operation must create an accounting record
+	•	System must support future expansion
