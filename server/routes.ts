@@ -52,6 +52,7 @@ declare global {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Session configuration with MemoryStore
   const MemoryStoreSession = MemoryStore(session);
+  const isProduction = process.env.NODE_ENV === 'production';
   
   app.set('trust proxy', 1);
   app.use(
@@ -63,9 +64,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: true,
+        secure: isProduction,
         httpOnly: true,
-        sameSite: 'none',
+        sameSite: isProduction ? 'none' : 'lax',
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
       },
     })

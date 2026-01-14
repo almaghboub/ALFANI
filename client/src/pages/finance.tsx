@@ -73,7 +73,7 @@ export default function Finance() {
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
 
   const { data: summary, isLoading: summaryLoading } = useQuery<FinancialSummary>({
-    queryKey: ["/api/finance/summary"],
+    queryKey: ["/api/financial-summary"],
   });
 
   const { data: safes = [], isLoading: safesLoading } = useQuery<Safe[]>({
@@ -91,7 +91,7 @@ export default function Finance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
       setNewSafeDialogOpen(false);
       toast({ title: t("safeCreated") || "Safe created successfully" });
     },
@@ -107,7 +107,7 @@ export default function Finance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/banks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
       setNewBankDialogOpen(false);
       toast({ title: t("bankCreated") || "Bank created successfully" });
     },
@@ -124,7 +124,7 @@ export default function Finance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
       setSafeTransactionDialogOpen(false);
       setSelectedSafe(null);
       toast({ title: t("transactionCreated") || "Transaction recorded successfully" });
@@ -142,7 +142,7 @@ export default function Finance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/banks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
       setBankTransactionDialogOpen(false);
       setSelectedBank(null);
       toast({ title: t("transactionCreated") || "Transaction recorded successfully" });
