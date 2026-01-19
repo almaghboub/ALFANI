@@ -9,7 +9,7 @@ import { useAuth } from "@/components/auth-provider";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useIsMobile } from "@/hooks/use-mobile";
-import logoPath from "@assets/tajway_logo_1_-removebg-preview_1760403020566.png";
+import logoPath from "@assets/ALFANI-removebg-preview_1768829603636.png";
 
 const navigationItems = [
   { key: "dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"] },
@@ -71,7 +71,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
       {/* Logo and branding */}
       <div className="p-6 border-b border-border">
         <div className="flex items-center justify-center">
-          <img src={logoPath} alt="TajWay Logo" className="h-24 w-auto" style={{ objectFit: 'cover', objectPosition: 'top', maxHeight: '96px', clipPath: 'inset(0 0 50% 0)' }} />
+          <img src={logoPath} alt="ALFANI Logo" className="h-20 w-auto" />
         </div>
       </div>
 
