@@ -70,7 +70,7 @@ export default function Login() {
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4 mt-6">
-            <img src={logoPath} alt="ALFANI Logo" className="h-48 w-auto" />
+            <img src={logoPath} alt="ALFANI Logo" className="h-64 w-auto" />
           </div>
           <CardTitle className="text-2xl font-bold">ALFANI</CardTitle>
           <p className="text-muted-foreground">{t('logisticsManagementSystem')}</p>
