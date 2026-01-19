@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/header";
@@ -22,7 +23,7 @@ export default function Products() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [formData, setFormData] = useState<Partial<InsertProduct>>({
+  const [formData, setFormData] = useState<Partial<InsertProduct> & { branch?: string; initialQuantity?: number }>({
     name: "",
     sku: "",
     category: "",
@@ -30,6 +31,8 @@ export default function Products() {
     price: "0",
     costPrice: "0",
     isActive: true,
+    branch: "ALFANI1",
+    initialQuantity: 0,
   });
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
@@ -43,6 +46,7 @@ export default function Products() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products-with-inventory"] });
       setIsCreateDialogOpen(false);
       resetForm();
       toast({ title: t("success"), description: t("productCreated") });
@@ -93,6 +97,8 @@ export default function Products() {
       price: "0",
       costPrice: "0",
       isActive: true,
+      branch: "ALFANI1",
+      initialQuantity: 0,
     });
   };
 
@@ -106,6 +112,8 @@ export default function Products() {
       price: product.price,
       costPrice: product.costPrice || "0",
       isActive: product.isActive,
+      branch: "ALFANI1",
+      initialQuantity: 0,
     });
     setIsEditDialogOpen(true);
   };
@@ -117,9 +125,10 @@ export default function Products() {
 
   const handleSubmit = () => {
     if (isEditDialogOpen && selectedProduct) {
-      updateMutation.mutate({ id: selectedProduct.id, data: formData as InsertProduct });
+      const { branch, initialQuantity, ...productData } = formData;
+      updateMutation.mutate({ id: selectedProduct.id, data: productData as InsertProduct });
     } else {
-      createMutation.mutate(formData as InsertProduct);
+      createMutation.mutate(formData as InsertProduct & { branch: string; initialQuantity: number });
     }
   };
 
@@ -239,6 +248,23 @@ export default function Products() {
             <DialogTitle>{isEditDialogOpen ? t("editProduct") : t("addProduct")}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {!isEditDialogOpen && (
+              <div className="grid gap-2">
+                <Label>{t("branch")} *</Label>
+                <Select
+                  value={formData.branch || "ALFANI1"}
+                  onValueChange={(value) => setFormData({ ...formData, branch: value })}
+                >
+                  <SelectTrigger data-testid="select-product-branch">
+                    <SelectValue placeholder={t("selectBranch")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALFANI1">{t("ALFANI1")}</SelectItem>
+                    <SelectItem value="ALFANI2">{t("ALFANI2")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="name">{t("productName")} *</Label>
               <Input
@@ -271,6 +297,17 @@ export default function Products() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
+                <Label htmlFor="costPrice">{t("buyingPrice")} *</Label>
+                <Input
+                  id="costPrice"
+                  type="number"
+                  step="0.01"
+                  value={formData.costPrice || "0"}
+                  onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
+                  data-testid="input-product-cost-price"
+                />
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="price">{t("sellingPrice")} *</Label>
                 <Input
                   id="price"
@@ -281,18 +318,19 @@ export default function Products() {
                   data-testid="input-product-price"
                 />
               </div>
+            </div>
+            {!isEditDialogOpen && (
               <div className="grid gap-2">
-                <Label htmlFor="costPrice">{t("costPrice")}</Label>
+                <Label htmlFor="initialQuantity">{t("initialQuantity")}</Label>
                 <Input
-                  id="costPrice"
+                  id="initialQuantity"
                   type="number"
-                  step="0.01"
-                  value={formData.costPrice || "0"}
-                  onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
-                  data-testid="input-product-cost-price"
+                  value={formData.initialQuantity || 0}
+                  onChange={(e) => setFormData({ ...formData, initialQuantity: parseInt(e.target.value) || 0 })}
+                  data-testid="input-product-initial-quantity"
                 />
               </div>
-            </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="description">{t("description")}</Label>
               <Input

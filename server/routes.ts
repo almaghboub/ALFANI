@@ -1449,11 +1449,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/products", requireAuth, async (req, res) => {
     try {
-      const result = insertProductSchema.safeParse(req.body);
+      const { branch, initialQuantity, ...productData } = req.body;
+      const result = insertProductSchema.safeParse(productData);
       if (!result.success) {
         return res.status(400).json({ message: "Invalid product data", errors: result.error.errors });
       }
+      
+      if (!branch || (branch !== 'ALFANI1' && branch !== 'ALFANI2')) {
+        return res.status(400).json({ message: "Branch is required (ALFANI1 or ALFANI2)" });
+      }
+      
+      const qty = parseInt(initialQuantity) || 0;
+      if (qty < 0) {
+        return res.status(400).json({ message: "Initial quantity cannot be negative" });
+      }
+      
       const product = await storage.createProduct(result.data);
+      
+      await storage.upsertBranchInventory({
+        productId: product.id,
+        branch: branch,
+        quantity: qty,
+        lowStockThreshold: 5,
+      });
+      
       res.status(201).json(product);
     } catch (error) {
       res.status(500).json({ message: "Failed to create product" });
