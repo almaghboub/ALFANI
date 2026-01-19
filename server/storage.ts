@@ -73,13 +73,8 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./auth";
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
 import { eq, desc, sql, or, ilike } from "drizzle-orm";
-
-// Database connection
-const client = neon(process.env.DATABASE_URL!);
-const db = drizzle(client);
+import { db } from "./db";
 
 export interface IStorage {
   // Users
