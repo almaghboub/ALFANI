@@ -7,6 +7,7 @@ const resources = {
     translation: {
       // Navigation
       dashboard: "Dashboard",
+      products: "Products",
       orders: "Orders",
       readyToBuy: "Ready to Buy",
       buy: "Buy",
@@ -1035,6 +1036,7 @@ const resources = {
     translation: {
       // Navigation
       dashboard: "لوحة التحكم",
+      products: "المنتجات",
       orders: "الطلبات",
       readyToBuy: "جاهز للشراء",
       buy: "شراء",
