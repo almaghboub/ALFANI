@@ -90,7 +90,7 @@ export function SalesReport({ reportType, data, onPrint }: SalesReportProps) {
       <div className="mb-8">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold text-blue-600 mb-2">TajWay</h1>
+            <h1 className="text-3xl font-bold text-primary mb-2">ALFANI</h1>
             <p className="text-gray-600">{t('logisticsManagementSystem')}</p>
           </div>
           <div className="text-right">

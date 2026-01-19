@@ -192,7 +192,7 @@ export function Invoice({ order, lydExchangeRate = 0, onPrint }: InvoiceProps) {
         <div>
           <h3 className="text-sm font-bold mb-3 uppercase tracking-wide" style={{ color: '#FFD700' }}>{t('from')}:</h3>
           <div className="space-y-1">
-            <p className="font-bold text-lg">TajWay</p>
+            <p className="font-bold text-lg">ALFANI</p>
             <p className="text-sm">{t('companyTagline')}</p>
           </div>
         </div>
