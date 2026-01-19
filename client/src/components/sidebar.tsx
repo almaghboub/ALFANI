@@ -71,7 +71,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
       {/* Logo and branding */}
       <div className="p-6 border-b border-border">
         <div className="flex items-center justify-center">
-          <img src={logoPath} alt="ALFANI Logo" className="h-20 w-auto" />
+          <img src={logoPath} alt="ALFANI Logo" className="h-28 w-auto" />
         </div>
       </div>
 

@@ -169,7 +169,7 @@ export function Invoice({ order, lydExchangeRate = 0, onPrint }: InvoiceProps) {
       <div className="mb-8 border-b-4 pb-6" style={{ borderColor: '#FFD700' }}>
         <div className="flex justify-between items-start">
           <div className="flex items-center space-x-4">
-            <img src={logoPath} alt="ALFANI Logo" className="h-24 w-auto" />
+            <img src={logoPath} alt="ALFANI Logo" className="h-32 w-auto" />
           </div>
           <div className="text-right">
             <h2 className="text-3xl font-bold mb-2" style={{ color: '#FFD700' }}>{t('invoice')}</h2>
