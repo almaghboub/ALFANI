@@ -58,6 +58,17 @@ interface Bank {
   isActive: boolean;
 }
 
+interface InvoiceMetrics {
+  totalSales: number;
+  totalItems: number;
+  invoiceCount: number;
+  avgOrderValue: number;
+  byBranch: {
+    ALFANI1: { sales: number; count: number; items: number };
+    ALFANI2: { sales: number; count: number; items: number };
+  };
+}
+
 export default function Finance() {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
@@ -82,6 +93,14 @@ export default function Finance() {
 
   const { data: banks = [], isLoading: banksLoading } = useQuery<Bank[]>({
     queryKey: ["/api/banks"],
+  });
+
+  const { data: invoiceMetrics } = useQuery<InvoiceMetrics>({
+    queryKey: ["/api/invoices/metrics"],
+    queryFn: async () => {
+      const response = await fetch("/api/invoices/metrics?branch=all", { credentials: 'include' });
+      return response.json();
+    },
   });
 
   const createSafeMutation = useMutation({
@@ -208,9 +227,12 @@ export default function Finance() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
           <TabsTrigger value="overview" data-testid="tab-overview">
             {t("overview") || "Overview"}
+          </TabsTrigger>
+          <TabsTrigger value="sales" data-testid="tab-sales">
+            {t("salesByBranch") || "Sales by Branch"}
           </TabsTrigger>
           <TabsTrigger value="safes" data-testid="tab-safes">
             {t("safes") || "Safes"}
@@ -219,6 +241,74 @@ export default function Finance() {
             {t("banks") || "Banks"}
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="sales" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="border-2 border-blue-200 dark:border-blue-800">
+              <CardHeader className="bg-blue-50 dark:bg-blue-900/20">
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-blue-600" />
+                  {t("ALFANI1") || "ALFANI1"}
+                </CardTitle>
+                <CardDescription>{t("branchSalesData") || "Branch sales data"}</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">{t("totalSales") || "Total Sales"}</span>
+                    <span className="text-xl font-bold text-green-600">
+                      ${(invoiceMetrics?.byBranch?.ALFANI1?.sales || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">{t("invoices") || "Invoices"}</span>
+                    <span className="text-xl font-bold">
+                      {invoiceMetrics?.byBranch?.ALFANI1?.count || 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">{t("itemsSold") || "Items Sold"}</span>
+                    <span className="text-xl font-bold">
+                      {invoiceMetrics?.byBranch?.ALFANI1?.items || 0}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-2 border-purple-200 dark:border-purple-800">
+              <CardHeader className="bg-purple-50 dark:bg-purple-900/20">
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-purple-600" />
+                  {t("ALFANI2") || "ALFANI2"}
+                </CardTitle>
+                <CardDescription>{t("branchSalesData") || "Branch sales data"}</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">{t("totalSales") || "Total Sales"}</span>
+                    <span className="text-xl font-bold text-green-600">
+                      ${(invoiceMetrics?.byBranch?.ALFANI2?.sales || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">{t("invoices") || "Invoices"}</span>
+                    <span className="text-xl font-bold">
+                      {invoiceMetrics?.byBranch?.ALFANI2?.count || 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">{t("itemsSold") || "Items Sold"}</span>
+                    <span className="text-xl font-bold">
+                      {invoiceMetrics?.byBranch?.ALFANI2?.items || 0}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-6">
           {summaryLoading ? (

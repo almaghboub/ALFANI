@@ -1965,6 +1965,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/invoices/metrics", requireAuth, async (req, res) => {
+    try {
+      const branch = req.query.branch as string | undefined;
+      const invoices = await storage.getAllInvoices();
+      
+      const filteredInvoices = branch && branch !== 'all' 
+        ? invoices.filter(inv => inv.branch === branch)
+        : invoices;
+      
+      const totalSales = filteredInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
+      const totalItems = filteredInvoices.reduce((sum, inv) => 
+        sum + inv.items.reduce((s, i) => s + i.quantity, 0), 0);
+      const invoiceCount = filteredInvoices.length;
+      const avgOrderValue = invoiceCount > 0 ? totalSales / invoiceCount : 0;
+      
+      const byBranch = {
+        ALFANI1: {
+          sales: invoices.filter(i => i.branch === 'ALFANI1').reduce((s, i) => s + Number(i.totalAmount), 0),
+          count: invoices.filter(i => i.branch === 'ALFANI1').length,
+          items: invoices.filter(i => i.branch === 'ALFANI1').reduce((s, inv) => 
+            s + inv.items.reduce((is, item) => is + item.quantity, 0), 0),
+        },
+        ALFANI2: {
+          sales: invoices.filter(i => i.branch === 'ALFANI2').reduce((s, i) => s + Number(i.totalAmount), 0),
+          count: invoices.filter(i => i.branch === 'ALFANI2').length,
+          items: invoices.filter(i => i.branch === 'ALFANI2').reduce((s, inv) => 
+            s + inv.items.reduce((is, item) => is + item.quantity, 0), 0),
+        },
+      };
+      
+      res.json({
+        totalSales,
+        totalItems,
+        invoiceCount,
+        avgOrderValue,
+        byBranch,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch invoice metrics" });
+    }
+  });
+
   app.get("/api/invoices/:id", requireAuth, async (req, res) => {
     try {
       const invoice = await storage.getInvoice(req.params.id);
