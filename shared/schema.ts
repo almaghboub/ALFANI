@@ -241,6 +241,27 @@ export const branchInventory = pgTable("branch_inventory", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Sales Invoices
+export const salesInvoices = pgTable("sales_invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  customerName: text("customer_name").notNull(),
+  branch: branchEnum("branch").notNull(),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Invoice Items
+export const invoiceItems = pgTable("invoice_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => salesInvoices.id, { onDelete: "cascade" }),
+  productId: varchar("product_id").notNull().references(() => products.id),
+  productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+});
+
 // ============ END CAR ACCESSORIES PRODUCTS ============
 
 export const users = pgTable("users", {
@@ -545,6 +566,15 @@ export const insertBranchInventorySchema = createInsertSchema(branchInventory).o
   updatedAt: true,
 });
 
+export const insertSalesInvoiceSchema = createInsertSchema(salesInvoices).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({
+  id: true,
+});
+
 // Login schema
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -631,9 +661,20 @@ export type Product = typeof products.$inferSelect;
 export type InsertBranchInventory = z.infer<typeof insertBranchInventorySchema>;
 export type BranchInventory = typeof branchInventory.$inferSelect;
 
+export type InsertSalesInvoice = z.infer<typeof insertSalesInvoiceSchema>;
+export type SalesInvoice = typeof salesInvoices.$inferSelect;
+
+export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
+export type InvoiceItem = typeof invoiceItems.$inferSelect;
+
 // Extended product type with inventory
 export type ProductWithInventory = Product & {
   inventory: BranchInventory[];
+};
+
+// Extended invoice type with items
+export type SalesInvoiceWithItems = SalesInvoice & {
+  items: InvoiceItem[];
 };
 
 export type LoginCredentials = z.infer<typeof loginSchema>;

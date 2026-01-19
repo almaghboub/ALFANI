@@ -1,27 +1,23 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, Package, Users, Box, TrendingUp, DollarSign, Users2, Settings, LogOut, MessageSquare, Menu, ShoppingCart, Wallet, Boxes, Warehouse } from "lucide-react";
+import { LayoutDashboard, TrendingUp, DollarSign, Users2, Settings, LogOut, Menu, Wallet, Boxes, Warehouse, Receipt, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/components/auth-provider";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { useIsMobile } from "@/hooks/use-mobile";
 import logoPath from "@assets/ALFANI-removebg-preview_1768829603636.png";
 
 const navigationItems = [
   { key: "dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"] },
+  { key: "newInvoice", href: "/invoice", icon: Receipt, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
+  { key: "salesHistory", href: "/sales", icon: History, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
   { key: "products", href: "/products", icon: Boxes, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
   { key: "inventory", href: "/inventory", icon: Warehouse, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
-  { key: "orders", href: "/orders", icon: ShoppingCart, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"] },
-  { key: "customers", href: "/customers", icon: Users, roles: ["owner", "customer_service", "receptionist"] },
   { key: "finance", href: "/finance", icon: Wallet, roles: ["owner"] },
   { key: "profitReports", href: "/profits", icon: TrendingUp, roles: ["owner"] },
   { key: "expenses", href: "/expenses", icon: DollarSign, roles: ["owner"] },
   { key: "userManagement", href: "/users", icon: Users2, roles: ["owner"] },
-  { key: "messages", href: "/messages", icon: MessageSquare, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"], showBadge: true },
   { key: "settings", href: "/settings", icon: Settings, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"] },
 ];
 
@@ -33,18 +29,6 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const { t } = useTranslation();
-
-  const { data: unreadCountData } = useQuery({
-    queryKey: ["/api/messages/unread-count"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/messages/unread-count");
-      return response.json() as Promise<{ count: number }>;
-    },
-    enabled: !!user,
-    refetchInterval: 30000,
-  });
-
-  const unreadCount = unreadCountData?.count || 0;
 
   const handleLogout = async () => {
     try {
@@ -92,15 +76,6 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
                   >
                     <Icon className="w-4 h-4" />
                     <span className={`flex-1 ${isActive ? "font-medium" : ""}`}>{t(item.key)}</span>
-                    {item.showBadge && unreadCount > 0 && (
-                      <Badge 
-                        variant="destructive" 
-                        className="ltr:ml-auto rtl:mr-auto"
-                        data-testid="badge-unread-messages"
-                      >
-                        {unreadCount}
-                      </Badge>
-                    )}
                   </span>
                 </Link>
               </li>

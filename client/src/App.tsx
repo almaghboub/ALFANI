@@ -10,17 +10,15 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
-import Orders from "@/pages/orders";
-import Customers from "@/pages/customers";
 import Profits from "@/pages/profits";
 import Expenses from "@/pages/expenses";
 import Users from "@/pages/users";
-import Messages from "@/pages/messages";
 import Settings from "@/pages/settings";
-import ReadyToBuy from "@/pages/ready-to-buy";
 import Finance from "@/pages/finance";
 import Products from "@/pages/products";
 import Inventory from "@/pages/inventory";
+import Invoice from "@/pages/invoice";
+import Sales from "@/pages/sales";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -130,15 +128,15 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      <Route path="/orders">
+      <Route path="/invoice">
         <ProtectedRoute>
-          <Orders />
+          <Invoice />
         </ProtectedRoute>
       </Route>
 
-      <Route path="/customers">
+      <Route path="/sales">
         <ProtectedRoute>
-          <Customers />
+          <Sales />
         </ProtectedRoute>
       </Route>
 
@@ -160,12 +158,6 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      <Route path="/messages">
-        <ProtectedRoute>
-          <Messages />
-        </ProtectedRoute>
-      </Route>
-
       <Route path="/settings">
         <ProtectedRoute>
           <Settings />
@@ -182,12 +174,6 @@ function Router() {
         <ProtectedRoute>
           <Inventory />
         </ProtectedRoute>
-      </Route>
-
-      <Route path="/ready-to-buy">
-        <RoleProtectedRoute allowedRoles={["owner", "customer_service", "receptionist"]}>
-          <ReadyToBuy />
-        </RoleProtectedRoute>
       </Route>
 
       <Route path="/finance">
