@@ -1,0 +1,163 @@
+ALFANI – Multi-Branch Car Accessories Sales & Inventory Management System
+System Overview
+
+ALFANI is a centralized sales and inventory management system designed specifically for car accessories retail businesses operating across multiple branches. The platform enables unified customer and sales management while maintaining strict separation of inventory between branches.
+
+The system is built to support daily point-of-sale operations, stock control, customer tracking, and business reporting within a single integrated environment.
+
+Business Model
+
+ALFANI operates as one system with multiple physical branches:
+
+ALFANI1
+
+ALFANI2
+
+Customers and sales orders are shared across the entire system, while inventory is managed independently for each branch.
+
+This design allows the business to function as one company while preserving accurate stock tracking per location.
+
+Core Functionalities
+1. Product Management
+
+Central product catalog for all car accessories.
+
+Each product contains name, category, SKU, price, and description.
+
+Products are shared across all branches.
+
+2. Inventory Management (Branch-Specific)
+
+Inventory is stored separately for each branch.
+
+When adding stock, the system requires selecting:
+
+ALFANI1 or ALFANI2
+
+Stock quantities are tracked independently per branch.
+
+Low-stock monitoring per location.
+
+3. Sales & Order Management
+
+Customers are selected from a shared customer database.
+
+When creating a new sale:
+
+Products from all branches appear in one list.
+
+Each product is displayed with its available branch and quantity.
+
+The user selects the desired product and branch.
+
+The system automatically deducts stock from the selected branch.
+
+A single order can include items from both branches.
+
+4. Customer Management
+
+Central customer database shared across all branches.
+
+Stores:
+
+Name
+
+Phone number
+
+Purchase history
+
+Outstanding balances (optional)
+
+Customers can buy from any branch using the same profile.
+
+5. Multi-Branch Architecture
+
+The system follows this structure:
+
+One database
+
+One application
+
+Multiple branches
+
+Shared sales and customers
+
+Separate inventory per branch
+
+This ensures:
+
+Accurate stock tracking
+
+Centralized reporting
+
+Simplified management
+
+No inventory conflicts
+
+6. Reporting & Analytics
+
+The system provides:
+
+Sales by branch
+
+Total sales (combined)
+
+Best-selling products
+
+Stock levels per branch
+
+Daily, weekly, and monthly reports
+
+Branch performance comparison
+
+7. User Roles (Optional)
+
+Owner – full access
+
+Branch Manager – branch-specific access
+
+Cashier – sales only
+
+Stock Manager – inventory only
+
+Example Workflow
+
+Add new product: “Car Battery”
+
+Add stock:
+
+10 units to ALFANI1
+
+5 units to ALFANI2
+
+Customer visits store.
+
+New order is created.
+
+System shows:
+
+Car Battery – ALFANI1 (10 in stock)
+
+Car Battery – ALFANI2 (5 in stock)
+
+User selects one.
+
+Stock is deducted from the selected branch.
+
+Key Benefits
+
+Centralized sales management
+
+Accurate branch inventory tracking
+
+Reduced stock errors
+
+Faster checkout process
+
+Scalable to more branches in the future
+
+Suitable for small to medium retail businesses
+
+System Purpose
+
+ALFANI is designed to modernize car accessories retail operations by replacing manual stock tracking with a structured, automated, and branch-aware digital system.
