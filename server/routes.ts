@@ -1981,28 +1981,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { customerName, branch, items } = req.body;
       
-      if (!customerName || !branch || !items || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ message: "Invalid invoice data" });
+      if (!customerName || typeof customerName !== 'string' || customerName.trim() === '') {
+        return res.status(400).json({ message: "Customer name is required" });
+      }
+      
+      if (!branch || (branch !== 'ALFANI1' && branch !== 'ALFANI2')) {
+        return res.status(400).json({ message: "Invalid branch" });
+      }
+      
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required" });
+      }
+      
+      for (const item of items) {
+        if (!item.productId || !item.productName || typeof item.quantity !== 'number' || item.quantity <= 0) {
+          return res.status(400).json({ message: "Invalid item data" });
+        }
+        if (typeof item.unitPrice !== 'number' || item.unitPrice < 0) {
+          return res.status(400).json({ message: "Invalid unit price" });
+        }
+      }
+      
+      const stockCheck = await storage.checkInvoiceStock(branch, items);
+      if (!stockCheck.success) {
+        return res.status(400).json({ message: stockCheck.message });
       }
       
       const invoiceNumber = await storage.generateInvoiceNumber();
-      const totalAmount = items.reduce((sum: number, item: any) => sum + item.lineTotal, 0);
+      
+      const itemsData = items.map((item: any) => {
+        const lineTotal = item.quantity * item.unitPrice;
+        return {
+          invoiceId: "",
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: String(item.unitPrice),
+          lineTotal: String(lineTotal),
+        };
+      });
+      
+      const totalAmount = itemsData.reduce((sum: number, item: any) => sum + parseFloat(item.lineTotal), 0);
       
       const invoiceData = {
         invoiceNumber,
-        customerName,
+        customerName: customerName.trim(),
         branch,
         totalAmount: String(totalAmount),
       };
-      
-      const itemsData = items.map((item: any) => ({
-        invoiceId: "",
-        productId: item.productId,
-        productName: item.productName,
-        quantity: item.quantity,
-        unitPrice: String(item.unitPrice),
-        lineTotal: String(item.lineTotal),
-      }));
       
       const invoice = await storage.createInvoice(invoiceData, itemsData);
       res.status(201).json(invoice);

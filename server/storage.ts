@@ -272,6 +272,7 @@ export interface IStorage {
   getInvoice(id: string): Promise<SalesInvoiceWithItems | undefined>;
   createInvoice(invoice: InsertSalesInvoice, items: InsertInvoiceItem[]): Promise<SalesInvoiceWithItems>;
   generateInvoiceNumber(): Promise<string>;
+  checkInvoiceStock(branch: string, items: Array<{productId: string; quantity: number}>): Promise<{success: boolean; message?: string}>;
 }
 
 export class MemStorage implements IStorage {
@@ -2000,6 +2001,22 @@ export class PostgreSQLStorage implements IStorage {
     
     const nextNum = existingInvoices.length + 1;
     return `${datePrefix}-${String(nextNum).padStart(4, '0')}`;
+  }
+  
+  async checkInvoiceStock(branch: string, items: Array<{productId: string; quantity: number}>): Promise<{success: boolean; message?: string}> {
+    for (const item of items) {
+      const inv = await db.select().from(branchInventory)
+        .where(sql`${branchInventory.productId} = ${item.productId} AND ${branchInventory.branch} = ${branch}`);
+      
+      if (inv.length === 0) {
+        return { success: false, message: `Product not found in ${branch} inventory` };
+      }
+      
+      if (inv[0].quantity < item.quantity) {
+        return { success: false, message: `Insufficient stock for product. Available: ${inv[0].quantity}, Requested: ${item.quantity}` };
+      }
+    }
+    return { success: true };
   }
 }
 
