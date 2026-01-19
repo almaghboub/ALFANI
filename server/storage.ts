@@ -70,6 +70,13 @@ import {
   receipts,
   accountingEntries,
   mainOfficeAccount,
+  products,
+  branchInventory,
+  type Product,
+  type InsertProduct,
+  type BranchInventory,
+  type InsertBranchInventory,
+  type ProductWithInventory,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./auth";
@@ -238,6 +245,20 @@ export interface IStorage {
     totalSupplierDebt: number;
     recentTransactions: Array<{ type: string; amount: number; date: Date }>;
   }>;
+
+  // ============ PRODUCTS & INVENTORY ============
+  
+  // Products
+  getAllProducts(): Promise<Product[]>;
+  getProduct(id: string): Promise<Product | undefined>;
+  createProduct(product: InsertProduct): Promise<Product>;
+  updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
+  deleteProduct(id: string): Promise<boolean>;
+  getProductsWithInventory(): Promise<ProductWithInventory[]>;
+
+  // Branch Inventory
+  getBranchInventory(productId: string): Promise<BranchInventory[]>;
+  upsertBranchInventory(inventory: InsertBranchInventory): Promise<BranchInventory>;
 }
 
 export class MemStorage implements IStorage {
@@ -1855,6 +1876,62 @@ export class PostgreSQLStorage implements IStorage {
       totalSupplierDebt: Number(supplierDebtResult[0]?.total || 0),
       recentTransactions,
     };
+  }
+
+  // ============ PRODUCTS & INVENTORY ============
+
+  async getAllProducts(): Promise<Product[]> {
+    return await db.select().from(products).orderBy(desc(products.createdAt));
+  }
+
+  async getProduct(id: string): Promise<Product | undefined> {
+    const result = await db.select().from(products).where(eq(products.id, id));
+    return result[0];
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const result = await db.insert(products).values(product).returning();
+    return result[0];
+  }
+
+  async updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined> {
+    const result = await db.update(products).set({ ...product, updatedAt: new Date() }).where(eq(products.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteProduct(id: string): Promise<boolean> {
+    const result = await db.delete(products).where(eq(products.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getProductsWithInventory(): Promise<ProductWithInventory[]> {
+    const allProducts = await db.select().from(products).orderBy(desc(products.createdAt));
+    const allInventory = await db.select().from(branchInventory);
+    
+    return allProducts.map(product => ({
+      ...product,
+      inventory: allInventory.filter(inv => inv.productId === product.id),
+    }));
+  }
+
+  async getBranchInventory(productId: string): Promise<BranchInventory[]> {
+    return await db.select().from(branchInventory).where(eq(branchInventory.productId, productId));
+  }
+
+  async upsertBranchInventory(inventory: InsertBranchInventory): Promise<BranchInventory> {
+    const existing = await db.select().from(branchInventory)
+      .where(sql`${branchInventory.productId} = ${inventory.productId} AND ${branchInventory.branch} = ${inventory.branch}`);
+    
+    if (existing.length > 0) {
+      const result = await db.update(branchInventory)
+        .set({ quantity: inventory.quantity, lowStockThreshold: inventory.lowStockThreshold, updatedAt: new Date() })
+        .where(eq(branchInventory.id, existing[0].id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(branchInventory).values(inventory).returning();
+      return result[0];
+    }
   }
 }
 

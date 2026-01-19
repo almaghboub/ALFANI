@@ -263,7 +263,7 @@ export default function Products() {
               <Label htmlFor="category">{t("category")}</Label>
               <Input
                 id="category"
-                value={formData.category}
+                value={formData.category || ""}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 placeholder={t("enterCategory")}
                 data-testid="input-product-category"
@@ -287,7 +287,7 @@ export default function Products() {
                   id="costPrice"
                   type="number"
                   step="0.01"
-                  value={formData.costPrice}
+                  value={formData.costPrice || "0"}
                   onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
                   data-testid="input-product-cost-price"
                 />
@@ -297,7 +297,7 @@ export default function Products() {
               <Label htmlFor="description">{t("description")}</Label>
               <Input
                 id="description"
-                value={formData.description}
+                value={formData.description || ""}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder={t("enterDescription")}
                 data-testid="input-product-description"

@@ -31,6 +31,8 @@ import {
   insertSupplierSchema,
   insertReceiptSchema,
   insertAccountingEntrySchema,
+  insertProductSchema,
+  insertBranchInventorySchema,
   loginSchema,
 } from "@shared/schema";
 import { darbAssabilService } from "./services/darbAssabil";
@@ -1409,6 +1411,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Expense deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete expense" });
+    }
+  });
+
+  // ============ PRODUCTS & INVENTORY ROUTES ============
+
+  // Products
+  app.get("/api/products", requireAuth, async (req, res) => {
+    try {
+      const products = await storage.getAllProducts();
+      res.json(products);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
+  app.get("/api/products/with-inventory", requireAuth, async (req, res) => {
+    try {
+      const products = await storage.getProductsWithInventory();
+      res.json(products);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch products with inventory" });
+    }
+  });
+
+  app.get("/api/products/:id", requireAuth, async (req, res) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      res.json(product);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch product" });
+    }
+  });
+
+  app.post("/api/products", requireAuth, async (req, res) => {
+    try {
+      const result = insertProductSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid product data", errors: result.error.errors });
+      }
+      const product = await storage.createProduct(result.data);
+      res.status(201).json(product);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create product" });
+    }
+  });
+
+  app.patch("/api/products/:id", requireAuth, async (req, res) => {
+    try {
+      const product = await storage.updateProduct(req.params.id, req.body);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      res.json(product);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update product" });
+    }
+  });
+
+  app.delete("/api/products/:id", requireAuth, async (req, res) => {
+    try {
+      const success = await storage.deleteProduct(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      res.json({ message: "Product deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete product" });
+    }
+  });
+
+  // Branch Inventory
+  app.post("/api/inventory", requireAuth, async (req, res) => {
+    try {
+      const result = insertBranchInventorySchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid inventory data", errors: result.error.errors });
+      }
+      const inventory = await storage.upsertBranchInventory(result.data);
+      res.status(201).json(inventory);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update inventory" });
+    }
+  });
+
+  app.get("/api/inventory/:productId", requireAuth, async (req, res) => {
+    try {
+      const inventory = await storage.getBranchInventory(req.params.productId);
+      res.json(inventory);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch inventory" });
     }
   });
 
