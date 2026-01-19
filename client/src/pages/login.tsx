@@ -67,12 +67,12 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/20">
-      <Card className="w-full max-w-md mx-4">
+      <Card className="w-full max-w-xl mx-4">
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-4 mt-6">
-            <img src={logoPath} alt="ALFANI Logo" className="h-64 w-auto scale-150" />
+          <div className="flex justify-center mb-6 mt-8 py-8">
+            <img src={logoPath} alt="ALFANI Logo" className="w-80 h-auto object-contain" />
           </div>
-          <CardTitle className="text-2xl font-bold">ALFANI</CardTitle>
+          <CardTitle className="text-3xl font-bold">ALFANI</CardTitle>
           <p className="text-muted-foreground">{t('logisticsManagementSystem')}</p>
         </CardHeader>
         <CardContent>
