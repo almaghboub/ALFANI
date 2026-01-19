@@ -211,6 +211,38 @@ export const userPermissions = pgTable("user_permissions", {
 
 // ============ END FINANCIAL MODULES ============
 
+// ============ CAR ACCESSORIES PRODUCTS ============
+
+// Branch enum for ALFANI1 and ALFANI2
+export const branchEnum = pgEnum("branch", ["ALFANI1", "ALFANI2"]);
+
+// Products catalog (shared across all branches)
+export const products = pgTable("products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  sku: text("sku").notNull().unique(),
+  category: text("category"),
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Branch-specific inventory (stock per branch)
+export const branchInventory = pgTable("branch_inventory", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  branch: branchEnum("branch").notNull(),
+  quantity: integer("quantity").notNull().default(0),
+  lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// ============ END CAR ACCESSORIES PRODUCTS ============
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
@@ -500,6 +532,19 @@ export const insertUserPermissionSchema = createInsertSchema(userPermissions).om
   updatedAt: true,
 });
 
+// Product Insert Schemas
+export const insertProductSchema = createInsertSchema(products).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertBranchInventorySchema = createInsertSchema(branchInventory).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Login schema
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -578,6 +623,18 @@ export type InsertUserPermission = z.infer<typeof insertUserPermissionSchema>;
 export type UserPermission = typeof userPermissions.$inferSelect;
 
 export type MainOfficeAccountType = typeof mainOfficeAccount.$inferSelect;
+
+// Product Types
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type Product = typeof products.$inferSelect;
+
+export type InsertBranchInventory = z.infer<typeof insertBranchInventorySchema>;
+export type BranchInventory = typeof branchInventory.$inferSelect;
+
+// Extended product type with inventory
+export type ProductWithInventory = Product & {
+  inventory: BranchInventory[];
+};
 
 export type LoginCredentials = z.infer<typeof loginSchema>;
 

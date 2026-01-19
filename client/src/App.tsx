@@ -17,12 +17,10 @@ import Expenses from "@/pages/expenses";
 import Users from "@/pages/users";
 import Messages from "@/pages/messages";
 import Settings from "@/pages/settings";
-import DeliveryTasks from "@/pages/delivery-tasks";
-import TaskAssignment from "@/pages/task-assignment";
-import TaskHistory from "@/pages/task-history";
-import DarbAssabil from "@/pages/darb-assabil";
 import ReadyToBuy from "@/pages/ready-to-buy";
 import Finance from "@/pages/finance";
+import Products from "@/pages/products";
+import Inventory from "@/pages/inventory";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -174,28 +172,16 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      <Route path="/delivery-tasks">
-        <RoleProtectedRoute allowedRoles={["shipping_staff"]}>
-          <DeliveryTasks />
-        </RoleProtectedRoute>
+      <Route path="/products">
+        <ProtectedRoute>
+          <Products />
+        </ProtectedRoute>
       </Route>
 
-      <Route path="/task-assignment">
-        <RoleProtectedRoute allowedRoles={["owner", "customer_service", "receptionist"]}>
-          <TaskAssignment />
-        </RoleProtectedRoute>
-      </Route>
-
-      <Route path="/task-history">
-        <RoleProtectedRoute allowedRoles={["owner", "customer_service", "receptionist"]}>
-          <TaskHistory />
-        </RoleProtectedRoute>
-      </Route>
-
-      <Route path="/darb-assabil">
-        <RoleProtectedRoute allowedRoles={["owner", "customer_service", "receptionist"]}>
-          <DarbAssabil />
-        </RoleProtectedRoute>
+      <Route path="/inventory">
+        <ProtectedRoute>
+          <Inventory />
+        </ProtectedRoute>
       </Route>
 
       <Route path="/ready-to-buy">

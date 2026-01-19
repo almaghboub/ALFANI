@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { Truck, LayoutDashboard, Package, Users, Box, TrendingUp, DollarSign, Users2, Settings, LogOut, MessageSquare, ClipboardList, UserCog, History, Menu, ShoppingCart, Wallet } from "lucide-react";
+import { LayoutDashboard, Package, Users, Box, TrendingUp, DollarSign, Users2, Settings, LogOut, MessageSquare, Menu, ShoppingCart, Wallet, Boxes, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -13,19 +13,16 @@ import logoPath from "@assets/ALFANI-removebg-preview_1768829603636.png";
 
 const navigationItems = [
   { key: "dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"] },
-  { key: "orders", href: "/orders", icon: Package, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"] },
-  { key: "readyToBuy", href: "/ready-to-buy", icon: ShoppingCart, roles: ["owner", "customer_service", "receptionist"] },
+  { key: "products", href: "/products", icon: Boxes, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
+  { key: "inventory", href: "/inventory", icon: Warehouse, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
+  { key: "orders", href: "/orders", icon: ShoppingCart, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"] },
   { key: "customers", href: "/customers", icon: Users, roles: ["owner", "customer_service", "receptionist"] },
-  { key: "deliveryTasks", href: "/delivery-tasks", icon: ClipboardList, roles: ["shipping_staff"] },
-  { key: "taskAssignment", href: "/task-assignment", icon: UserCog, roles: ["owner", "customer_service", "receptionist"] },
-  { key: "taskHistory", href: "/task-history", icon: History, roles: ["owner", "customer_service", "receptionist"] },
-  { key: "darbAssabil", href: "/darb-assabil", icon: Truck, roles: ["owner", "customer_service", "receptionist"] },
   { key: "finance", href: "/finance", icon: Wallet, roles: ["owner"] },
   { key: "profitReports", href: "/profits", icon: TrendingUp, roles: ["owner"] },
   { key: "expenses", href: "/expenses", icon: DollarSign, roles: ["owner"] },
   { key: "userManagement", href: "/users", icon: Users2, roles: ["owner"] },
-  { key: "messages", href: "/messages", icon: MessageSquare, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager", "shipping_staff"], showBadge: true },
-  { key: "settings", href: "/settings", icon: Settings, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager", "shipping_staff"] },
+  { key: "messages", href: "/messages", icon: MessageSquare, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"], showBadge: true },
+  { key: "settings", href: "/settings", icon: Settings, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"] },
 ];
 
 interface SidebarContentProps {
