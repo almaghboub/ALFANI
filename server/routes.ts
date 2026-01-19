@@ -1955,6 +1955,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sales Invoices
+  app.get("/api/invoices", requireAuth, async (req, res) => {
+    try {
+      const invoices = await storage.getAllInvoices();
+      res.json(invoices);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  app.get("/api/invoices/:id", requireAuth, async (req, res) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+
+  app.post("/api/invoices", requireAuth, async (req, res) => {
+    try {
+      const { customerName, branch, items } = req.body;
+      
+      if (!customerName || !branch || !items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "Invalid invoice data" });
+      }
+      
+      const invoiceNumber = await storage.generateInvoiceNumber();
+      const totalAmount = items.reduce((sum: number, item: any) => sum + item.lineTotal, 0);
+      
+      const invoiceData = {
+        invoiceNumber,
+        customerName,
+        branch,
+        totalAmount: String(totalAmount),
+      };
+      
+      const itemsData = items.map((item: any) => ({
+        invoiceId: "",
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: String(item.unitPrice),
+        lineTotal: String(item.lineTotal),
+      }));
+      
+      const invoice = await storage.createInvoice(invoiceData, itemsData);
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error("Failed to create invoice:", error);
+      res.status(500).json({ message: "Failed to create invoice" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

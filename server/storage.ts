@@ -72,11 +72,18 @@ import {
   mainOfficeAccount,
   products,
   branchInventory,
+  salesInvoices,
+  invoiceItems,
   type Product,
   type InsertProduct,
   type BranchInventory,
   type InsertBranchInventory,
   type ProductWithInventory,
+  type SalesInvoice,
+  type InsertSalesInvoice,
+  type InvoiceItem,
+  type InsertInvoiceItem,
+  type SalesInvoiceWithItems,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./auth";
@@ -259,6 +266,12 @@ export interface IStorage {
   // Branch Inventory
   getBranchInventory(productId: string): Promise<BranchInventory[]>;
   upsertBranchInventory(inventory: InsertBranchInventory): Promise<BranchInventory>;
+  
+  // Sales Invoices
+  getAllInvoices(): Promise<SalesInvoiceWithItems[]>;
+  getInvoice(id: string): Promise<SalesInvoiceWithItems | undefined>;
+  createInvoice(invoice: InsertSalesInvoice, items: InsertInvoiceItem[]): Promise<SalesInvoiceWithItems>;
+  generateInvoiceNumber(): Promise<string>;
 }
 
 export class MemStorage implements IStorage {
@@ -1932,6 +1945,61 @@ export class PostgreSQLStorage implements IStorage {
       const result = await db.insert(branchInventory).values(inventory).returning();
       return result[0];
     }
+  }
+
+  async getAllInvoices(): Promise<SalesInvoiceWithItems[]> {
+    const allInvoices = await db.select().from(salesInvoices).orderBy(desc(salesInvoices.createdAt));
+    const allItems = await db.select().from(invoiceItems);
+    
+    return allInvoices.map(invoice => ({
+      ...invoice,
+      items: allItems.filter(item => item.invoiceId === invoice.id),
+    }));
+  }
+
+  async getInvoice(id: string): Promise<SalesInvoiceWithItems | undefined> {
+    const invoiceResult = await db.select().from(salesInvoices).where(eq(salesInvoices.id, id));
+    if (invoiceResult.length === 0) return undefined;
+    
+    const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+    return { ...invoiceResult[0], items };
+  }
+
+  async createInvoice(invoice: InsertSalesInvoice, items: InsertInvoiceItem[]): Promise<SalesInvoiceWithItems> {
+    const invoiceResult = await db.insert(salesInvoices).values(invoice).returning();
+    const createdInvoice = invoiceResult[0];
+    
+    const itemsWithInvoiceId = items.map(item => ({
+      ...item,
+      invoiceId: createdInvoice.id,
+    }));
+    
+    const createdItems = await db.insert(invoiceItems).values(itemsWithInvoiceId).returning();
+    
+    for (const item of items) {
+      const inv = await db.select().from(branchInventory)
+        .where(sql`${branchInventory.productId} = ${item.productId} AND ${branchInventory.branch} = ${invoice.branch}`);
+      
+      if (inv.length > 0) {
+        const newQty = Math.max(0, inv[0].quantity - item.quantity);
+        await db.update(branchInventory)
+          .set({ quantity: newQty, updatedAt: new Date() })
+          .where(eq(branchInventory.id, inv[0].id));
+      }
+    }
+    
+    return { ...createdInvoice, items: createdItems };
+  }
+
+  async generateInvoiceNumber(): Promise<string> {
+    const today = new Date();
+    const datePrefix = `INV-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+    
+    const existingInvoices = await db.select().from(salesInvoices)
+      .where(sql`${salesInvoices.invoiceNumber} LIKE ${datePrefix + '%'}`);
+    
+    const nextNum = existingInvoices.length + 1;
+    return `${datePrefix}-${String(nextNum).padStart(4, '0')}`;
   }
 }
 
