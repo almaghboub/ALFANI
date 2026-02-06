@@ -67,8 +67,11 @@ export default function Dashboard() {
     },
   });
 
+  const isOwner = user?.role === 'owner';
+
   const { data: financialSummary, isLoading: summaryLoading } = useQuery<FinancialSummary>({
     queryKey: ["/api/financial-summary"],
+    enabled: isOwner,
   });
 
   const { data: products = [] } = useQuery<ProductWithInventory[]>({
@@ -81,6 +84,7 @@ export default function Dashboard() {
 
   const { data: expenses = [] } = useQuery<any[]>({
     queryKey: ["/api/expenses"],
+    enabled: isOwner,
   });
 
   const totalProducts = products.length;
@@ -210,7 +214,7 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {user?.role === 'owner' && (
+        {isOwner && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card data-testid="card-safe-balance">
               <CardContent className="p-6">
@@ -277,7 +281,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {user?.role === 'owner' && invoiceMetrics?.byBranch && (
+        {isOwner && invoiceMetrics?.byBranch && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card className="border-2 border-blue-200 dark:border-blue-800" data-testid="card-branch-alfani1">
               <CardHeader className="pb-2">
@@ -445,57 +449,55 @@ export default function Dashboard() {
           )}
         </div>
 
-        {user?.role !== 'shipping_staff' && (
-          <Card data-testid="card-quick-actions">
-            <CardHeader>
-              <CardTitle>{t('quickActions') || "Quick Actions"}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Button
-                  className="p-4 h-auto flex-col"
-                  data-testid="button-new-invoice"
-                  onClick={() => setLocation("/invoice")}
-                >
-                  <Receipt className="w-6 h-6 mb-2" />
-                  <span className="font-medium text-sm">{t('newInvoice') || "New Invoice"}</span>
-                </Button>
+        <Card data-testid="card-quick-actions">
+          <CardHeader>
+            <CardTitle>{t('quickActions') || "Quick Actions"}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={`grid grid-cols-2 ${isOwner ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
+              <Button
+                className="p-4 h-auto flex-col"
+                data-testid="button-new-invoice"
+                onClick={() => setLocation("/invoice")}
+              >
+                <Receipt className="w-6 h-6 mb-2" />
+                <span className="font-medium text-sm">{t('newInvoice') || "New Invoice"}</span>
+              </Button>
 
-                <Button
-                  variant="secondary"
-                  className="p-4 h-auto flex-col"
-                  data-testid="button-go-products"
-                  onClick={() => setLocation("/products")}
-                >
-                  <Boxes className="w-6 h-6 mb-2" />
-                  <span className="font-medium text-sm">{t('products') || "Products"}</span>
-                </Button>
+              <Button
+                variant="secondary"
+                className="p-4 h-auto flex-col"
+                data-testid="button-go-products"
+                onClick={() => setLocation("/products")}
+              >
+                <Boxes className="w-6 h-6 mb-2" />
+                <span className="font-medium text-sm">{t('products') || "Products"}</span>
+              </Button>
 
+              <Button
+                variant="outline"
+                className="p-4 h-auto flex-col"
+                data-testid="button-go-inventory"
+                onClick={() => setLocation("/inventory")}
+              >
+                <Warehouse className="w-6 h-6 mb-2" />
+                <span className="font-medium text-sm">{t('inventory') || "Inventory"}</span>
+              </Button>
+
+              {isOwner && (
                 <Button
                   variant="outline"
                   className="p-4 h-auto flex-col"
-                  data-testid="button-go-inventory"
-                  onClick={() => setLocation("/inventory")}
+                  data-testid="button-go-finance"
+                  onClick={() => setLocation("/finance")}
                 >
-                  <Warehouse className="w-6 h-6 mb-2" />
-                  <span className="font-medium text-sm">{t('inventory') || "Inventory"}</span>
+                  <Wallet className="w-6 h-6 mb-2" />
+                  <span className="font-medium text-sm">{t('finance') || "Finance"}</span>
                 </Button>
-
-                {user?.role === 'owner' && (
-                  <Button
-                    variant="outline"
-                    className="p-4 h-auto flex-col"
-                    data-testid="button-go-finance"
-                    onClick={() => setLocation("/finance")}
-                  >
-                    <Wallet className="w-6 h-6 mb-2" />
-                    <span className="font-medium text-sm">{t('finance') || "Finance"}</span>
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

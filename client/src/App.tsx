@@ -141,21 +141,21 @@ function Router() {
       </Route>
 
       <Route path="/profits">
-        <ProtectedRoute>
+        <RoleProtectedRoute allowedRoles={["owner"]}>
           <Profits />
-        </ProtectedRoute>
+        </RoleProtectedRoute>
       </Route>
 
       <Route path="/expenses">
-        <ProtectedRoute>
+        <RoleProtectedRoute allowedRoles={["owner"]}>
           <Expenses />
-        </ProtectedRoute>
+        </RoleProtectedRoute>
       </Route>
 
       <Route path="/users">
-        <ProtectedRoute>
+        <RoleProtectedRoute allowedRoles={["owner"]}>
           <Users />
-        </ProtectedRoute>
+        </RoleProtectedRoute>
       </Route>
 
       <Route path="/settings">

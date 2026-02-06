@@ -853,7 +853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Settings routes
-  app.get("/api/settings", requireOwner, async (req, res) => {
+  app.get("/api/settings", requireAuth, async (req, res) => {
     try {
       const settings = await storage.getAllSettings();
       res.json(settings);
@@ -862,7 +862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/settings/:key", requireOwner, async (req, res) => {
+  app.get("/api/settings/:key", requireAuth, async (req, res) => {
     try {
       const setting = await storage.getSetting(req.params.key);
       if (!setting) {
@@ -1379,7 +1379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Expenses routes
-  app.get("/api/expenses", requireAuth, async (req, res) => {
+  app.get("/api/expenses", requireOwner, async (req, res) => {
     try {
       const expenses = await storage.getAllExpenses();
       res.json(expenses);
@@ -1615,7 +1615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Safes
-  app.get("/api/safes", requireAuth, async (req, res) => {
+  app.get("/api/safes", requireOwner, async (req, res) => {
     try {
       const safes = await storage.getAllSafes();
       res.json(safes);
@@ -1662,7 +1662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Safe Transactions
-  app.get("/api/safes/:safeId/transactions", requireAuth, async (req, res) => {
+  app.get("/api/safes/:safeId/transactions", requireOwner, async (req, res) => {
     try {
       const transactions = await storage.getSafeTransactions(req.params.safeId);
       res.json(transactions);
@@ -1689,7 +1689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Banks
-  app.get("/api/banks", requireAuth, async (req, res) => {
+  app.get("/api/banks", requireOwner, async (req, res) => {
     try {
       const banks = await storage.getAllBanks();
       res.json(banks);
@@ -1736,7 +1736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bank Transactions
-  app.get("/api/banks/:bankId/transactions", requireAuth, async (req, res) => {
+  app.get("/api/banks/:bankId/transactions", requireOwner, async (req, res) => {
     try {
       const transactions = await storage.getBankTransactions(req.params.bankId);
       res.json(transactions);
@@ -2033,7 +2033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Cashbox Reconciliation
-  app.get("/api/reconciliations", requireAuth, async (req, res) => {
+  app.get("/api/reconciliations", requireOwner, async (req, res) => {
     try {
       const reconciliations = await storage.getAllReconciliations();
       res.json(reconciliations);
@@ -2077,7 +2077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Owner Accounts
-  app.get("/api/owner-accounts", requireAuth, async (req, res) => {
+  app.get("/api/owner-accounts", requireOwner, async (req, res) => {
     try {
       const accounts = await storage.getAllOwnerAccounts();
       res.json(accounts);
@@ -2096,7 +2096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Capital Transactions
-  app.get("/api/owner-accounts/:id/transactions", requireAuth, async (req, res) => {
+  app.get("/api/owner-accounts/:id/transactions", requireOwner, async (req, res) => {
     try {
       const transactions = await storage.getCapitalTransactions(req.params.id);
       res.json(transactions);
