@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/components/auth-provider";
 import { useIsMobile } from "@/hooks/use-mobile";
-import logoPath from "@assets/ALFANI-removebg-preview_1768829603636.png";
+import logoPath from "@assets/alfani-logo.png";
 
 const navigationItems = [
   { key: "dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"] },

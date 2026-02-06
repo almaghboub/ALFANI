@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/queryClient";
 import { loginSchema, type LoginCredentials } from "@shared/schema";
-import logoPath from "@assets/ALFANI-removebg-preview_1768829603636.png";
+import logoPath from "@assets/alfani-logo.png";
 
 export default function Login() {
   const [, setLocation] = useLocation();

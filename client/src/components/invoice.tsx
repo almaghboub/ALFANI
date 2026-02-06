@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import logoPath from "@assets/ALFANI-removebg-preview_1768829603636.png";
+import logoPath from "@assets/alfani-logo.png";
 import { useLydExchangeRate } from "@/hooks/use-lyd-exchange-rate";
 
 interface OrderWithItems {
