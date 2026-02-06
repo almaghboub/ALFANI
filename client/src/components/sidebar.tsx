@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, TrendingUp, DollarSign, Users2, Settings, LogOut, Menu, Wallet, Boxes, Warehouse, Receipt, History, ChevronRight } from "lucide-react";
+import { LayoutDashboard, TrendingUp, DollarSign, Users2, Settings, LogOut, Menu, Wallet, Boxes, Warehouse, Receipt, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/components/auth-provider";
@@ -48,21 +48,20 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[hsl(222,47%,11%)] text-white">
-      <div className="px-6 py-5 border-b border-white/10">
-        <div className="flex items-center justify-center">
-          <div className="bg-white rounded-xl p-2 shadow-lg shadow-black/20">
-            <img src={logoPath} alt="ALFANI Logo" className="h-16 w-auto" />
+    <div className="flex flex-col h-full bg-card border-r border-border">
+      <div className="px-5 py-5 border-b border-border">
+        <div className="flex items-center gap-3 rtl:flex-row-reverse">
+          <img src={logoPath} alt="ALFANI Logo" className="h-12 w-auto" />
+          <div>
+            <h1 className="text-lg font-bold text-foreground tracking-tight">ALFANI</h1>
+            <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-medium">Auto Parts</p>
           </div>
-        </div>
-        <div className="mt-2 text-center">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-medium">Auto Parts & Accessories</p>
         </div>
       </div>
 
       <nav className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin">
-        <div className="space-y-1">
-          {filteredNavigation.map((item, index) => {
+        <div className="space-y-0.5">
+          {filteredNavigation.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href;
             
@@ -70,21 +69,18 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
               <li key={item.key} className="list-none">
                 <Link href={item.href} onClick={handleNavClick}>
                   <span
-                    className={`group relative flex items-center gap-3 rtl:flex-row-reverse px-3 py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer ${
+                    className={`relative flex items-center gap-3 rtl:flex-row-reverse px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 cursor-pointer ${
                       isActive
-                        ? "bg-gradient-to-r from-amber-500/20 to-amber-600/10 text-amber-400 shadow-sm shadow-amber-500/10 font-semibold"
-                        : "text-white/60 hover:text-white hover:bg-white/5"
+                        ? "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                     }`}
                     data-testid={`nav-${item.key.toLowerCase().replace(/([A-Z])/g, '-$1').toLowerCase()}`}
                   >
                     {isActive && (
-                      <div className="absolute ltr:left-0 rtl:right-0 w-[3px] h-6 bg-amber-400 rounded-full" />
+                      <div className="absolute ltr:left-0 rtl:right-0 w-[3px] h-5 bg-amber-500 rounded-full" />
                     )}
-                    <Icon className={`w-[18px] h-[18px] flex-shrink-0 transition-colors ${isActive ? 'text-amber-400' : 'text-white/40 group-hover:text-white/70'}`} />
+                    <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-amber-600 dark:text-amber-400' : ''}`} />
                     <span className="flex-1 truncate">{t(item.key)}</span>
-                    {isActive && (
-                      <ChevronRight className="w-4 h-4 text-amber-400/60 rtl:rotate-180" />
-                    )}
                   </span>
                 </Link>
               </li>
@@ -93,18 +89,18 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
         </div>
       </nav>
 
-      <div className="px-3 py-4 border-t border-white/10">
+      <div className="px-3 py-3 border-t border-border">
         <div className="flex items-center gap-3 rtl:flex-row-reverse px-3 py-2">
-          <div className="w-9 h-9 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg flex items-center justify-center shadow-md shadow-amber-500/20">
-            <span className="text-xs font-bold text-slate-900">
+          <div className="w-9 h-9 bg-amber-100 dark:bg-amber-500/20 rounded-full flex items-center justify-center">
+            <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
               {user?.firstName?.[0]}{user?.lastName?.[0]}
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white/90 truncate">
+            <p className="text-sm font-semibold text-foreground truncate">
               {user?.firstName} {user?.lastName}
             </p>
-            <p className="text-[11px] text-white/40 truncate capitalize">
+            <p className="text-[11px] text-muted-foreground truncate capitalize">
               {user?.role?.replace("_", " ")}
             </p>
           </div>
@@ -112,7 +108,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
             variant="ghost"
             size="sm"
             onClick={handleLogout}
-            className="text-white/40 hover:text-red-400 hover:bg-red-500/10 h-8 w-8 p-0"
+            className="text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 h-8 w-8 p-0"
             data-testid="button-logout"
           >
             <LogOut className="w-4 h-4" />
@@ -129,8 +125,8 @@ export function Sidebar() {
 
   if (!isMobile) {
     return (
-      <aside className="w-[260px] min-h-screen flex-shrink-0 shadow-xl">
-        <div className="fixed w-[260px] h-screen overflow-hidden">
+      <aside className="w-[250px] min-h-screen flex-shrink-0">
+        <div className="fixed w-[250px] h-screen overflow-hidden">
           <SidebarContent />
         </div>
       </aside>
@@ -149,7 +145,7 @@ export function Sidebar() {
           <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-[260px] p-0 border-none">
+      <SheetContent side="left" className="w-[250px] p-0 border-none">
         <SidebarContent onNavigate={() => setIsOpen(false)} />
       </SheetContent>
     </Sheet>
