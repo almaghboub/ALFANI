@@ -1,223 +1,208 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { TrendingUp, DollarSign, Percent, Package, Clock, Plus, UserPlus, PackagePlus, FileText, Database, ShieldCheck, Settings as SettingsIcon, Check, BarChart3, PieChart, Users, ShoppingCart, CheckCircle, Truck } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingUp, DollarSign, Package, Receipt, Plus, Boxes, Warehouse, Wallet, BarChart3, AlertTriangle, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/header";
-import { analyticsApi } from "@/lib/api";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/components/auth-provider";
-import { useLydExchangeRate } from "@/hooks/use-lyd-exchange-rate";
-import type { OrderWithCustomer } from "@shared/schema";
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+
+interface InvoiceMetrics {
+  totalSales: number;
+  totalItems: number;
+  invoiceCount: number;
+  avgOrderValue: number;
+  byBranch: {
+    ALFANI1: { sales: number; count: number; items: number };
+    ALFANI2: { sales: number; count: number; items: number };
+  };
+}
+
+interface FinancialSummary {
+  totalSafeBalanceUSD: number;
+  totalSafeBalanceLYD: number;
+  totalBankBalanceUSD: number;
+  totalBankBalanceLYD: number;
+  totalCustomerDebt: number;
+  totalSupplierDebt: number;
+  recentTransactions: Array<{ type: string; amount: number; date: string }>;
+}
+
+interface ProductWithInventory {
+  id: string;
+  name: string;
+  sku: string;
+  price: string;
+  costPrice: string;
+  isActive: boolean;
+  branchInventory?: Array<{ branch: string; quantity: number; lowStockThreshold: number }>;
+}
+
+interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  customerName: string;
+  branch: string;
+  totalAmount: string;
+  createdAt: string;
+  items: Array<{ productName: string; quantity: number; unitPrice: string; totalPrice: string }>;
+}
 
 export default function Dashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const { data: metrics, isLoading } = useQuery({
-    queryKey: ["/api/analytics/dashboard"],
-    queryFn: analyticsApi.getDashboardMetrics,
-  });
+  const isRTL = i18n.language === "ar";
 
-  // Use shared LYD exchange rate hook
-  const { exchangeRate, convertToLYD } = useLydExchangeRate();
-
-  const translateStatus = (status: string) => {
-    const statusNormalized = status.toLowerCase().replace(/[\s_-]+/g, '');
-    switch (statusNormalized) {
-      case 'delivered':
-        return t('statusDelivered');
-      case 'completed':
-        return t('statusCompleted');
-      case 'cancelled':
-        return t('statusCancelled');
-      case 'partiallyarrived':
-        return t('statusPartiallyArrived');
-      case 'readytocollect':
-        return t('statusReadyToCollect');
-      case 'withshippingcompany':
-        return t('statusWithShippingCompany');
-      default:
-        return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-    }
-  };
-
-  const { data: orders = [] } = useQuery({
-    queryKey: ["/api/orders"],
+  const { data: invoiceMetrics, isLoading: metricsLoading } = useQuery<InvoiceMetrics>({
+    queryKey: ["/api/invoices/metrics"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/orders");
-      return response.json() as Promise<OrderWithCustomer[]>;
-    },
-  });
-
-  const { data: customers = [] } = useQuery({
-    queryKey: ["/api/customers"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/customers");
+      const response = await fetch("/api/invoices/metrics?branch=all", { credentials: 'include' });
       return response.json();
     },
   });
 
-  const { data: settings = [] } = useQuery<Array<{ id: string; key: string; value: string }>>({
-    queryKey: ["/api/settings"],
+  const { data: financialSummary, isLoading: summaryLoading } = useQuery<FinancialSummary>({
+    queryKey: ["/api/financial-summary"],
   });
 
-  const lydExchangeRate = parseFloat(settings.find(s => s.key === 'lyd_exchange_rate')?.value || '0');
+  const { data: products = [] } = useQuery<ProductWithInventory[]>({
+    queryKey: ["/api/products/with-inventory"],
+  });
 
-  // Calculate current month sales
-  const currentMonthSales = orders
-    .filter(order => {
-      const orderDate = new Date(order.createdAt);
-      const now = new Date();
-      return orderDate.getMonth() === now.getMonth() && 
-             orderDate.getFullYear() === now.getFullYear();
-    })
-    .reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
+  const { data: invoices = [] } = useQuery<Invoice[]>({
+    queryKey: ["/api/invoices"],
+  });
 
-  // Get completed and active orders count (case-insensitive)
-  const completedOrders = orders.filter(order => {
-    const status = order.status.toLowerCase();
-    return status === "delivered" || status === "completed";
-  }).length;
+  const { data: expenses = [] } = useQuery<any[]>({
+    queryKey: ["/api/expenses"],
+  });
 
-  const activeOrdersCount = orders.filter(order => {
-    const status = order.status.toLowerCase();
-    return status !== "delivered" && status !== "completed" && status !== "cancelled";
-  }).length;
+  const totalProducts = products.length;
+  const activeProducts = products.filter(p => p.isActive).length;
+  const lowStockProducts = products.filter(p => {
+    const totalQty = p.branchInventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
+    const threshold = p.branchInventory?.[0]?.lowStockThreshold || 5;
+    return totalQty > 0 && totalQty <= threshold;
+  });
+  const outOfStockProducts = products.filter(p => {
+    const totalQty = p.branchInventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
+    return totalQty === 0;
+  });
 
-  // Get recent orders (last 5, sorted by date)
-  const recentOrders = [...orders]
+  const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount || "0"), 0);
+
+  const recentInvoices = [...invoices]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
 
-  // Calculate revenue trend for last 6 months
-  const revenueData = [];
+  const salesData = [];
   for (let i = 5; i >= 0; i--) {
     const monthDate = subMonths(new Date(), i);
     const monthStart = startOfMonth(monthDate);
     const monthEnd = endOfMonth(monthDate);
-    
-    const monthRevenue = orders
-      .filter(order => {
-        const orderDate = new Date(order.createdAt);
-        return isWithinInterval(orderDate, { start: monthStart, end: monthEnd });
+
+    const monthSales = invoices
+      .filter(inv => {
+        const invDate = new Date(inv.createdAt);
+        return isWithinInterval(invDate, { start: monthStart, end: monthEnd });
       })
-      .reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
-    
-    revenueData.push({
-      month: format(monthDate, 'MMM yyyy'),
-      revenue: parseFloat(monthRevenue.toFixed(2))
+      .reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
+
+    salesData.push({
+      month: format(monthDate, 'MMM'),
+      sales: parseFloat(monthSales.toFixed(2))
     });
   }
 
-  // Calculate order status distribution
-  const statusCounts: { [key: string]: number } = {};
-  orders.forEach(order => {
-    const status = order.status.toLowerCase();
-    const normalizedStatus = 
-      status === "delivered" || status === "completed" ? "Completed" :
-      status === "cancelled" ? "Cancelled" :
-      status === "pending" ? "Pending" :
-      status === "processing" ? "Processing" :
-      status === "shipped" ? "Shipped" :
-      status === "partially_arrived" ? "Partially Arrived" :
-      status === "ready_to_collect" ? "Ready to Collect" :
-      status === "with_shipping_company" ? "With Shipping" :
-      "Other";
-    
-    statusCounts[normalizedStatus] = (statusCounts[normalizedStatus] || 0) + 1;
-  });
-
-  const orderStatusData = Object.entries(statusCounts).map(([name, value]) => ({
-    name,
-    value
-  }));
-
-  const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6366f1'];
-
   return (
-    <div className="flex-1 flex flex-col min-h-screen">
-      <Header 
-        title={t('dashboard')} 
-        description={t('welcomeBack')} 
+    <div className="flex-1 flex flex-col min-h-screen" dir={isRTL ? "rtl" : "ltr"}>
+      <Header
+        title={t('dashboard')}
+        description={t('welcomeBack')}
       />
-      
+
       <div className="flex-1 p-6 space-y-6 bg-muted/20">
-        {/* Metrics Grid - First Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="animate-fade-in" data-testid="card-total-orders">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card data-testid="card-total-sales">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">{t('totalOrders')}</p>
-                  <p className="text-2xl font-bold text-blue-600" data-testid="text-total-orders">
-                    {orders.length}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">{t('allTime')}</p>
+                  <p className="text-sm text-muted-foreground">{t('totalSales') || "Total Sales"}</p>
+                  {metricsLoading ? (
+                    <Skeleton className="h-8 w-24 mt-1" />
+                  ) : (
+                    <p className="text-2xl font-bold text-green-600" data-testid="text-total-sales">
+                      ${(invoiceMetrics?.totalSales || 0).toFixed(2)}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">{t('allInvoices') || "All invoices"}</p>
                 </div>
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <ShoppingCart className="w-5 h-5 text-blue-600" />
+                <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-green-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="animate-fade-in" data-testid="card-customers">
+          <Card data-testid="card-total-invoices">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">{t('totalCustomers')}</p>
-                  <p className="text-2xl font-bold text-purple-600" data-testid="text-customers">
-                    {customers.length}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">{t('registered')}</p>
+                  <p className="text-sm text-muted-foreground">{t('totalInvoices') || "Total Invoices"}</p>
+                  {metricsLoading ? (
+                    <Skeleton className="h-8 w-24 mt-1" />
+                  ) : (
+                    <p className="text-2xl font-bold text-blue-600" data-testid="text-total-invoices">
+                      {invoiceMetrics?.invoiceCount || 0}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">{t('allTime') || "All time"}</p>
                 </div>
-                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <Users className="w-5 h-5 text-purple-600" />
+                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                  <Receipt className="w-5 h-5 text-blue-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="animate-fade-in" data-testid="card-completed-orders">
+          <Card data-testid="card-total-products">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">{t('completedOrders')}</p>
-                  <p className="text-2xl font-bold text-green-600" data-testid="text-completed-orders">
-                    {completedOrders}
+                  <p className="text-sm text-muted-foreground">{t('totalProducts') || "Total Products"}</p>
+                  <p className="text-2xl font-bold text-purple-600" data-testid="text-total-products">
+                    {totalProducts}
                   </p>
-                  <p className="text-xs text-green-600 flex items-center mt-1">
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    {t('statusDelivered')}
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">{activeProducts} {t('active') || "active"}</p>
                 </div>
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
+                <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                  <Boxes className="w-5 h-5 text-purple-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="animate-fade-in" data-testid="card-active-orders">
+          <Card data-testid="card-items-sold">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">{t('activeOrders')}</p>
-                  <p className="text-2xl font-bold text-orange-600" data-testid="text-active-orders">
-                    {activeOrdersCount}
-                  </p>
-                  <p className="text-xs text-orange-600 flex items-center mt-1">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {t('inProgress')}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{t('itemsSold') || "Items Sold"}</p>
+                  {metricsLoading ? (
+                    <Skeleton className="h-8 w-24 mt-1" />
+                  ) : (
+                    <p className="text-2xl font-bold text-orange-600" data-testid="text-items-sold">
+                      {invoiceMetrics?.totalItems || 0}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">{t('allTime') || "All time"}</p>
                 </div>
-                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
                   <Package className="w-5 h-5 text-orange-600" />
                 </div>
               </div>
@@ -225,410 +210,292 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Metrics Grid - Second Row (Revenue and Profit) - Hidden for Shipping Staff */}
-        {user?.role !== 'shipping_staff' && (
-          <div className={`grid grid-cols-1 ${user?.role === 'owner' ? 'md:grid-cols-2' : ''} gap-6`}>
-            <Card className="animate-fade-in" data-testid="card-month-sales">
+        {user?.role === 'owner' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card data-testid="card-safe-balance">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm text-muted-foreground">{t('currentMonthSales')}</p>
-                    {lydExchangeRate > 0 ? (
+                  <div>
+                    <p className="text-sm text-muted-foreground">{t('totalSafeBalance') || "Safe Balance"}</p>
+                    {summaryLoading ? (
+                      <Skeleton className="h-8 w-24 mt-1" />
+                    ) : (
                       <>
-                        <p className="text-2xl font-bold text-blue-600" data-testid="text-month-sales">
-                          {(currentMonthSales * lydExchangeRate).toFixed(2)} LYD
+                        <p className="text-2xl font-bold text-primary" data-testid="text-safe-balance">
+                          ${(financialSummary?.totalSafeBalanceUSD || 0).toFixed(2)}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          ${currentMonthSales.toFixed(2)}
+                        <p className="text-xs text-blue-600 font-semibold">
+                          {(financialSummary?.totalSafeBalanceLYD || 0).toFixed(2)} LYD
                         </p>
                       </>
-                    ) : (
-                      <p className="text-2xl font-bold text-primary" data-testid="text-month-sales">
-                        ${currentMonthSales.toFixed(2)}
-                      </p>
                     )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {format(new Date(), 'MMMM yyyy')}
-                    </p>
                   </div>
                   <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <DollarSign className="w-5 h-5 text-primary" />
+                    <Wallet className="w-5 h-5 text-primary" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {user?.role === 'owner' && (
-              <Card className="animate-fade-in" data-testid="card-total-profit">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="text-sm text-muted-foreground">{t('totalProfit')}</p>
-                      {isLoading ? (
-                        <Skeleton className="h-8 w-24 mt-1" />
-                      ) : lydExchangeRate > 0 ? (
-                        <>
-                          <p className="text-2xl font-bold text-blue-600" data-testid="text-total-profit">
-                            {((metrics?.totalProfit || 0) * lydExchangeRate).toFixed(2)} LYD
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            ${metrics?.totalProfit?.toFixed(2) || "0.00"}
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-2xl font-bold text-green-600" data-testid="text-total-profit">
-                            ${metrics?.totalProfit?.toFixed(2) || "0.00"}
-                          </p>
-                          {exchangeRate > 0 && metrics?.totalProfit !== undefined && (
-                            <p className="text-lg font-semibold text-primary mt-1" data-testid="text-total-profit-lyd">
-                              {convertToLYD(metrics.totalProfit)} LYD
-                            </p>
-                          )}
-                        </>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {t('allTime')} • {metrics?.profitMargin?.toFixed(1) || "0.0"}% {t('margin')}
+            <Card data-testid="card-avg-order">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">{t('avgOrderValue') || "Avg Order Value"}</p>
+                    {metricsLoading ? (
+                      <Skeleton className="h-8 w-24 mt-1" />
+                    ) : (
+                      <p className="text-2xl font-bold text-cyan-600" data-testid="text-avg-order">
+                        ${(invoiceMetrics?.avgOrderValue || 0).toFixed(2)}
                       </p>
-                    </div>
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                      <TrendingUp className="w-5 h-5 text-green-600" />
-                    </div>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">{t('perInvoice') || "Per invoice"}</p>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                  <div className="w-10 h-10 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg flex items-center justify-center">
+                    <BarChart3 className="w-5 h-5 text-cyan-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-total-expenses">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">{t('totalExpenses') || "Total Expenses"}</p>
+                    <p className="text-2xl font-bold text-red-600" data-testid="text-total-expenses">
+                      ${totalExpenses.toFixed(2)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">{expenses.length} {t('entries') || "entries"}</p>
+                  </div>
+                  <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                    <ArrowUpRight className="w-5 h-5 text-red-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
-        {/* Charts Grid */}
+        {user?.role === 'owner' && invoiceMetrics?.byBranch && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border-2 border-blue-200 dark:border-blue-800" data-testid="card-branch-alfani1">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  ALFANI 1
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t('totalSales') || "Sales"}</p>
+                    <p className="text-lg font-bold text-blue-600">${(invoiceMetrics.byBranch.ALFANI1?.sales || 0).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t('totalInvoices') || "Invoices"}</p>
+                    <p className="text-lg font-bold">{invoiceMetrics.byBranch.ALFANI1?.count || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t('itemsSold') || "Items"}</p>
+                    <p className="text-lg font-bold">{invoiceMetrics.byBranch.ALFANI1?.items || 0}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-2 border-emerald-200 dark:border-emerald-800" data-testid="card-branch-alfani2">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
+                  ALFANI 2
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t('totalSales') || "Sales"}</p>
+                    <p className="text-lg font-bold text-emerald-600">${(invoiceMetrics.byBranch.ALFANI2?.sales || 0).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t('totalInvoices') || "Invoices"}</p>
+                    <p className="text-lg font-bold">{invoiceMetrics.byBranch.ALFANI2?.count || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t('itemsSold') || "Items"}</p>
+                    <p className="text-lg font-bold">{invoiceMetrics.byBranch.ALFANI2?.items || 0}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card data-testid="card-revenue-chart">
+          <Card data-testid="card-sales-chart">
             <CardHeader>
-              <CardTitle>{t('revenueTrend')}</CardTitle>
+              <CardTitle>{t('salesTrend') || "Sales Trend"}</CardTitle>
+              <CardDescription>{t('last6Months') || "Last 6 months"}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueData}>
+                  <BarChart data={salesData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="month" 
-                      tick={{ fontSize: 12 }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip 
-                      formatter={(value) => lydExchangeRate > 0 
-                        ? [`${(Number(value) * lydExchangeRate).toFixed(2)} LYD`, `$${value}`]
-                        : `$${value}`
-                      }
-                      contentStyle={{ 
+                    <Tooltip
+                      formatter={(value) => [`$${value}`, t('totalSales') || 'Sales']}
+                      contentStyle={{
                         backgroundColor: 'hsl(var(--background))',
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '6px'
                       }}
                     />
-                    <Bar dataKey="revenue" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="sales" fill="#3b82f6" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
 
-          <Card data-testid="card-order-status-chart">
-            <CardHeader>
-              <CardTitle>{t('orderStatus')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPieChart>
-                    <Pie
-                      data={orderStatusData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {orderStatusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px'
-                      }}
-                    />
-                  </RechartsPieChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card data-testid="card-recent-orders">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>{t('recentOrders')}</CardTitle>
-                <Button 
-                  variant="link" 
-                  className="text-primary hover:text-primary/80 text-sm font-medium"
-                  onClick={() => setLocation("/orders")}
-                >
-                  {t('viewAll')}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {recentOrders.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Package className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-muted-foreground">{t('noRecentOrders')}</p>
-                    <p className="text-xs text-muted-foreground">{t('ordersWillAppear')}</p>
-                  </div>
-                ) : (
-                  recentOrders.map((order) => (
-                    <div 
-                      key={order.id} 
-                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => setLocation(`/orders`)}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                          <ShoppingCart className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{order.customer.shippingCode || order.orderNumber}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {order.customer.firstName} {order.customer.lastName}
-                          </p>
-                        </div>
+          {lowStockProducts.length > 0 || outOfStockProducts.length > 0 ? (
+            <Card data-testid="card-stock-alerts">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-500" />
+                  {t('stockAlerts') || "Stock Alerts"}
+                </CardTitle>
+                <CardDescription>
+                  {lowStockProducts.length} {t('lowStock') || "low stock"}, {outOfStockProducts.length} {t('outOfStock') || "out of stock"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-56 overflow-y-auto">
+                  {outOfStockProducts.map(p => (
+                    <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800" data-testid={`alert-outofstock-${p.id}`}>
+                      <div>
+                        <p className="font-medium text-sm">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{p.sku}</p>
                       </div>
-                      <div className="text-right">
-                        {lydExchangeRate > 0 ? (
-                          <>
-                            <p className="font-bold text-blue-600">{(parseFloat(order.totalAmount) * lydExchangeRate).toFixed(2)} LYD</p>
-                            <p className="text-xs text-muted-foreground">${parseFloat(order.totalAmount).toFixed(2)}</p>
-                          </>
-                        ) : (
-                          <p className="font-medium">${parseFloat(order.totalAmount).toFixed(2)}</p>
-                        )}
-                        <Badge variant={
-                          order.status.toLowerCase() === "delivered" || order.status.toLowerCase() === "completed" ? "default" : 
-                          order.status.toLowerCase() === "cancelled" ? "destructive" : "secondary"
-                        }>
-                          {translateStatus(order.status)}
+                      <Badge variant="destructive">{t('outOfStock') || "Out of Stock"}</Badge>
+                    </div>
+                  ))}
+                  {lowStockProducts.map(p => {
+                    const qty = p.branchInventory?.reduce((s, bi) => s + bi.quantity, 0) || 0;
+                    return (
+                      <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800" data-testid={`alert-lowstock-${p.id}`}>
+                        <div>
+                          <p className="font-medium text-sm">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">{p.sku}</p>
+                        </div>
+                        <Badge variant="outline" className="text-amber-600 border-amber-400">
+                          {qty} {t('remaining') || "remaining"}
                         </Badge>
                       </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card data-testid="card-recent-invoices">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{t('recentInvoices') || "Recent Invoices"}</CardTitle>
+                  <Button
+                    variant="link"
+                    className="text-primary hover:text-primary/80 text-sm font-medium"
+                    onClick={() => setLocation("/sales")}
+                    data-testid="button-view-all-invoices"
+                  >
+                    {t('viewAll') || "View All"}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {recentInvoices.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Receipt className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-muted-foreground">{t('noInvoicesYet') || "No invoices yet"}</p>
                     </div>
-                  ))
+                  ) : (
+                    recentInvoices.map((inv) => (
+                      <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors" data-testid={`invoice-row-${inv.id}`}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                            <Receipt className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{inv.invoiceNumber}</p>
+                            <p className="text-sm text-muted-foreground">{inv.customerName}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold">${Number(inv.totalAmount).toFixed(2)}</p>
+                          <Badge variant="outline" className="text-xs">{inv.branch}</Badge>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {user?.role !== 'shipping_staff' && (
+          <Card data-testid="card-quick-actions">
+            <CardHeader>
+              <CardTitle>{t('quickActions') || "Quick Actions"}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Button
+                  className="p-4 h-auto flex-col"
+                  data-testid="button-new-invoice"
+                  onClick={() => setLocation("/invoice")}
+                >
+                  <Receipt className="w-6 h-6 mb-2" />
+                  <span className="font-medium text-sm">{t('newInvoice') || "New Invoice"}</span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  className="p-4 h-auto flex-col"
+                  data-testid="button-go-products"
+                  onClick={() => setLocation("/products")}
+                >
+                  <Boxes className="w-6 h-6 mb-2" />
+                  <span className="font-medium text-sm">{t('products') || "Products"}</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="p-4 h-auto flex-col"
+                  data-testid="button-go-inventory"
+                  onClick={() => setLocation("/inventory")}
+                >
+                  <Warehouse className="w-6 h-6 mb-2" />
+                  <span className="font-medium text-sm">{t('inventory') || "Inventory"}</span>
+                </Button>
+
+                {user?.role === 'owner' && (
+                  <Button
+                    variant="outline"
+                    className="p-4 h-auto flex-col"
+                    data-testid="button-go-finance"
+                    onClick={() => setLocation("/finance")}
+                  >
+                    <Wallet className="w-6 h-6 mb-2" />
+                    <span className="font-medium text-sm">{t('finance') || "Finance"}</span>
+                  </Button>
                 )}
               </div>
             </CardContent>
           </Card>
-
-          <Card data-testid="card-system-status">
-            <CardHeader>
-              <CardTitle>{t('systemHealth')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="font-medium text-green-800">{t('databaseStatus')}</span>
-                  </div>
-                  <span className="text-green-600 font-medium">{t('healthy')}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="font-medium text-green-800">{t('authService')}</span>
-                  </div>
-                  <span className="text-green-600 font-medium">{t('active')}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="font-medium text-green-800">{t('sessionManagement')}</span>
-                  </div>
-                  <span className="text-green-600 font-medium">{t('running')}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="font-medium text-green-800">{t('apiEndpoints')}</span>
-                  </div>
-                  <span className="text-green-600 font-medium">{t('operational')}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="font-medium text-green-800">{t('roleBasedAccess')}</span>
-                  </div>
-                  <span className="text-green-600 font-medium">{t('enabled')}</span>
-                </div>
-
-                <Button 
-                  className="w-full mt-4" 
-                  data-testid="button-run-diagnostics"
-                >
-                  {t('runDiagnostics')}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Actions - Hidden for Shipping Staff */}
-        {user?.role !== 'shipping_staff' && (
-          <Card data-testid="card-quick-actions">
-            <CardHeader>
-              <CardTitle>{t('quickActions')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Button 
-                  className="p-4 h-auto flex-col" 
-                  data-testid="button-new-order"
-                  onClick={() => setLocation("/orders")}
-                >
-                  <Plus className="w-6 h-6 mb-2" />
-                  <span className="font-medium">{t('newOrder')}</span>
-                </Button>
-
-                <Button 
-                  variant="secondary" 
-                  className="p-4 h-auto flex-col" 
-                  data-testid="button-add-customer"
-                  onClick={() => setLocation("/customers")}
-                >
-                  <UserPlus className="w-6 h-6 mb-2" />
-                  <span className="font-medium">{t('addCustomer')}</span>
-                </Button>
-
-                <Button 
-                  variant="outline" 
-                  className="p-4 h-auto flex-col" 
-                  data-testid="button-task-assignment"
-                  onClick={() => setLocation("/task-assignment")}
-                >
-                  <Truck className="w-6 h-6 mb-2" />
-                  <span className="font-medium">{t('taskAssignment')}</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         )}
-
-        {/* Application Health Check */}
-        <Card data-testid="card-health-check">
-          <CardHeader>
-            <CardTitle>{t('applicationHealthCheck')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <h4 className="font-medium text-foreground flex items-center">
-                  <Database className="w-4 h-4 mr-2 text-green-600" />
-                  {t('databaseAndSchema')}
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center text-green-600">
-                    <Check className="w-3 h-3 mr-2" />
-                    <span>{t('postgresqlConnected')}</span>
-                  </div>
-                  <div className="flex items-center text-green-600">
-                    <Check className="w-3 h-3 mr-2" />
-                    <span>{t('drizzleApplied')}</span>
-                  </div>
-                  <div className="flex items-center text-green-600">
-                    <Check className="w-3 h-3 mr-2" />
-                    <span>{t('schemaValidated')}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-medium text-foreground flex items-center">
-                  <ShieldCheck className="w-4 h-4 mr-2 text-green-600" />
-                  {t('authenticationAndSessions')}
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center text-green-600">
-                    <Check className="w-3 h-3 mr-2" />
-                    <span>{t('passportActive')}</span>
-                  </div>
-                  <div className="flex items-center text-green-600">
-                    <Check className="w-3 h-3 mr-2" />
-                    <span>{t('sessionStoreConfigured')}</span>
-                  </div>
-                  <div className="flex items-center text-green-600">
-                    <Check className="w-3 h-3 mr-2" />
-                    <span>{t('rbacEnabled')}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-medium text-foreground flex items-center">
-                  <SettingsIcon className="w-4 h-4 mr-2 text-green-600" />
-                  {t('crudOperations')}
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center text-green-600">
-                    <Check className="w-3 h-3 mr-2" />
-                    <span>{t('orderManagementRestored')}</span>
-                  </div>
-                  <div className="flex items-center text-green-600">
-                    <Check className="w-3 h-3 mr-2" />
-                    <span>{t('customerOperations')}</span>
-                  </div>
-                  <div className="flex items-center text-green-600">
-                    <Check className="w-3 h-3 mr-2" />
-                    <span>{t('inventoryTracking')}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-medium text-foreground flex items-center">
-                  <TrendingUp className="w-4 h-4 mr-2 text-green-600" />
-                  {t('reportingAnalytics')}
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center text-green-600">
-                    <Check className="w-3 h-3 mr-2" />
-                    <span>{t('profitCalculations')}</span>
-                  </div>
-                  <div className="flex items-center text-green-600">
-                    <Check className="w-3 h-3 mr-2" />
-                    <span>{t('financialDashboard')}</span>
-                  </div>
-                  <div className="flex items-center text-green-600">
-                    <Check className="w-3 h-3 mr-2" />
-                    <span>Commission calculations active</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

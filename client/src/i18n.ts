@@ -7,6 +7,16 @@ const resources = {
     translation: {
       // Navigation
       dashboard: "Dashboard",
+      totalInvoices: "Total Invoices",
+      allInvoices: "All invoices",
+      totalProducts: "Total Products",
+      salesTrend: "Sales Trend",
+      last6Months: "Last 6 months",
+      stockAlerts: "Stock Alerts",
+      remaining: "remaining",
+      recentInvoices: "Recent Invoices",
+      noInvoicesYet: "No invoices yet",
+      perInvoice: "Per invoice",
       products: "Products",
       orders: "Orders",
       readyToBuy: "Ready to Buy",
@@ -1161,6 +1171,16 @@ const resources = {
     translation: {
       // Navigation
       dashboard: "لوحة التحكم",
+      totalInvoices: "إجمالي الفواتير",
+      allInvoices: "جميع الفواتير",
+      totalProducts: "إجمالي المنتجات",
+      salesTrend: "اتجاه المبيعات",
+      last6Months: "آخر 6 أشهر",
+      stockAlerts: "تنبيهات المخزون",
+      remaining: "متبقي",
+      recentInvoices: "أحدث الفواتير",
+      noInvoicesYet: "لا توجد فواتير بعد",
+      perInvoice: "لكل فاتورة",
       products: "المنتجات",
       orders: "الطلبات",
       readyToBuy: "جاهز للشراء",
