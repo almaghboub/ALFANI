@@ -84,6 +84,18 @@ import {
   type InvoiceItem,
   type InsertInvoiceItem,
   type SalesInvoiceWithItems,
+  expenseCategories,
+  cashboxReconciliations,
+  ownerAccounts,
+  capitalTransactions,
+  type InsertExpenseCategory,
+  type ExpenseCategory,
+  type InsertCashboxReconciliation,
+  type CashboxReconciliation,
+  type InsertOwnerAccount,
+  type OwnerAccount,
+  type InsertCapitalTransaction,
+  type CapitalTransaction,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./auth";
@@ -273,6 +285,23 @@ export interface IStorage {
   createInvoice(invoice: InsertSalesInvoice, items: InsertInvoiceItem[]): Promise<SalesInvoiceWithItems>;
   generateInvoiceNumber(): Promise<string>;
   checkInvoiceStock(branch: string, items: Array<{productId: string; quantity: number}>): Promise<{success: boolean; message?: string}>;
+
+  // Expense Categories
+  getAllExpenseCategories(): Promise<ExpenseCategory[]>;
+  createExpenseCategory(data: InsertExpenseCategory): Promise<ExpenseCategory>;
+
+  // Cashbox Reconciliation
+  getAllReconciliations(): Promise<CashboxReconciliation[]>;
+  createReconciliation(data: InsertCashboxReconciliation): Promise<CashboxReconciliation>;
+
+  // Owner Accounts
+  getAllOwnerAccounts(): Promise<OwnerAccount[]>;
+  createOwnerAccount(data: InsertOwnerAccount): Promise<OwnerAccount>;
+  updateOwnerAccount(id: string, data: Partial<InsertOwnerAccount>): Promise<OwnerAccount | undefined>;
+
+  // Capital Transactions
+  getCapitalTransactions(ownerAccountId: string): Promise<CapitalTransaction[]>;
+  createCapitalTransaction(data: InsertCapitalTransaction): Promise<CapitalTransaction>;
 }
 
 export class MemStorage implements IStorage {
@@ -2017,6 +2046,47 @@ export class PostgreSQLStorage implements IStorage {
       }
     }
     return { success: true };
+  }
+
+  async getAllExpenseCategories(): Promise<ExpenseCategory[]> {
+    return await db.select().from(expenseCategories).orderBy(desc(expenseCategories.createdAt));
+  }
+
+  async createExpenseCategory(data: InsertExpenseCategory): Promise<ExpenseCategory> {
+    const [category] = await db.insert(expenseCategories).values(data).returning();
+    return category;
+  }
+
+  async getAllReconciliations(): Promise<CashboxReconciliation[]> {
+    return await db.select().from(cashboxReconciliations).orderBy(desc(cashboxReconciliations.createdAt));
+  }
+
+  async createReconciliation(data: InsertCashboxReconciliation): Promise<CashboxReconciliation> {
+    const [reconciliation] = await db.insert(cashboxReconciliations).values(data).returning();
+    return reconciliation;
+  }
+
+  async getAllOwnerAccounts(): Promise<OwnerAccount[]> {
+    return await db.select().from(ownerAccounts).orderBy(desc(ownerAccounts.createdAt));
+  }
+
+  async createOwnerAccount(data: InsertOwnerAccount): Promise<OwnerAccount> {
+    const [account] = await db.insert(ownerAccounts).values(data).returning();
+    return account;
+  }
+
+  async updateOwnerAccount(id: string, data: Partial<InsertOwnerAccount>): Promise<OwnerAccount | undefined> {
+    const [account] = await db.update(ownerAccounts).set({ ...data, updatedAt: new Date() }).where(eq(ownerAccounts.id, id)).returning();
+    return account;
+  }
+
+  async getCapitalTransactions(ownerAccountId: string): Promise<CapitalTransaction[]> {
+    return await db.select().from(capitalTransactions).where(eq(capitalTransactions.ownerAccountId, ownerAccountId)).orderBy(desc(capitalTransactions.createdAt));
+  }
+
+  async createCapitalTransaction(data: InsertCapitalTransaction): Promise<CapitalTransaction> {
+    const [transaction] = await db.insert(capitalTransactions).values(data).returning();
+    return transaction;
   }
 }
 

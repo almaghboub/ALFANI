@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Wallet, Building2, Landmark, Warehouse, Users, Receipt, BookOpen, 
   Plus, ArrowUpRight, ArrowDownLeft, RefreshCw, TrendingUp, TrendingDown,
-  DollarSign, Banknote
+  DollarSign, Banknote, Scale, UserCircle
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -82,6 +82,11 @@ export default function Finance() {
   const [bankTransactionDialogOpen, setBankTransactionDialogOpen] = useState(false);
   const [selectedSafe, setSelectedSafe] = useState<Safe | null>(null);
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
+  const [reconciliationDialogOpen, setReconciliationDialogOpen] = useState(false);
+  const [selectedReconcileSafe, setSelectedReconcileSafe] = useState<string>("");
+  const [ownerAccountDialogOpen, setOwnerAccountDialogOpen] = useState(false);
+  const [capitalTxDialogOpen, setCapitalTxDialogOpen] = useState(false);
+  const [selectedOwnerAccount, setSelectedOwnerAccount] = useState<string>("");
 
   const { data: summary, isLoading: summaryLoading } = useQuery<FinancialSummary>({
     queryKey: ["/api/financial-summary"],
@@ -100,6 +105,60 @@ export default function Finance() {
     queryFn: async () => {
       const response = await fetch("/api/invoices/metrics?branch=all", { credentials: 'include' });
       return response.json();
+    },
+  });
+
+  const { data: reconciliations = [] } = useQuery<any[]>({
+    queryKey: ["/api/reconciliations"],
+  });
+
+  const { data: ownerAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/owner-accounts"],
+  });
+
+  const createReconciliationMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", "/api/reconciliations", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/reconciliations"] });
+      setReconciliationDialogOpen(false);
+      toast({ title: t("success") || "Success", description: t("reconciliationCreated") || "Reconciliation recorded" });
+    },
+    onError: () => {
+      toast({ title: t("error") || "Error", variant: "destructive" });
+    },
+  });
+
+  const createOwnerAccountMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", "/api/owner-accounts", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/owner-accounts"] });
+      setOwnerAccountDialogOpen(false);
+      toast({ title: t("success") || "Success" });
+    },
+    onError: () => {
+      toast({ title: t("error") || "Error", variant: "destructive" });
+    },
+  });
+
+  const createCapitalTxMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const { ownerAccountId, ...txData } = data;
+      const response = await apiRequest("POST", `/api/owner-accounts/${ownerAccountId}/transactions`, txData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/owner-accounts"] });
+      setCapitalTxDialogOpen(false);
+      toast({ title: t("success") || "Success" });
+    },
+    onError: () => {
+      toast({ title: t("error") || "Error", variant: "destructive" });
     },
   });
 
@@ -227,7 +286,7 @@ export default function Finance() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+        <TabsList className="flex flex-wrap gap-1 h-auto lg:inline-flex">
           <TabsTrigger value="overview" data-testid="tab-overview">
             {t("overview") || "Overview"}
           </TabsTrigger>
@@ -239,6 +298,12 @@ export default function Finance() {
           </TabsTrigger>
           <TabsTrigger value="banks" data-testid="tab-banks">
             {t("banks") || "Banks"}
+          </TabsTrigger>
+          <TabsTrigger value="reconciliation" data-testid="tab-reconciliation">
+            {t("reconciliation") || "Reconciliation"}
+          </TabsTrigger>
+          <TabsTrigger value="capital" data-testid="tab-capital">
+            {t("capital") || "Capital"}
           </TabsTrigger>
         </TabsList>
 
@@ -863,6 +928,323 @@ export default function Finance() {
               </form>
             </DialogContent>
           </Dialog>
+        </TabsContent>
+
+        <TabsContent value="reconciliation" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">{t("cashboxReconciliation") || "Cashbox Reconciliation"}</h2>
+            <Dialog open={reconciliationDialogOpen} onOpenChange={setReconciliationDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-new-reconciliation">
+                  <Scale className="h-4 w-4 mr-2" />
+                  {t("newReconciliation") || "New Reconciliation"}
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{t("reconcileCashbox") || "Reconcile Cashbox"}</DialogTitle>
+                </DialogHeader>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.currentTarget);
+                    createReconciliationMutation.mutate({
+                      safeId: formData.get("safeId") as string,
+                      actualBalanceUSD: formData.get("actualBalanceUSD") as string,
+                      actualBalanceLYD: formData.get("actualBalanceLYD") as string,
+                      notes: formData.get("notes") as string || undefined,
+                    });
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <Label>{t("selectCashbox") || "Select Cashbox"}</Label>
+                    <Select name="safeId" required value={selectedReconcileSafe} onValueChange={setSelectedReconcileSafe}>
+                      <SelectTrigger data-testid="select-reconcile-safe">
+                        <SelectValue placeholder={t("selectCashbox") || "Select cashbox"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {safes.filter(s => s.isActive).map(safe => (
+                          <SelectItem key={safe.id} value={safe.id}>
+                            {safe.name} (${parseFloat(String(safe.balanceUSD)).toFixed(2)} / {parseFloat(String(safe.balanceLYD)).toFixed(2)} LYD)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>{t("actualBalanceUSD") || "Actual Balance (USD)"}</Label>
+                      <Input name="actualBalanceUSD" type="number" step="0.01" required data-testid="input-actual-usd" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("actualBalanceLYD") || "Actual Balance (LYD)"}</Label>
+                      <Input name="actualBalanceLYD" type="number" step="0.01" required data-testid="input-actual-lyd" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t("notes") || "Notes"}</Label>
+                    <Input name="notes" data-testid="input-reconciliation-notes" />
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" disabled={createReconciliationMutation.isPending} data-testid="button-submit-reconciliation">
+                      {createReconciliationMutation.isPending ? t("saving") || "Saving..." : t("reconcile") || "Reconcile"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              {reconciliations.length === 0 ? (
+                <div className="text-center py-8">
+                  <Scale className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">{t("noReconciliations") || "No reconciliations recorded yet"}</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("date") || "Date"}</TableHead>
+                      <TableHead>{t("cashbox") || "Cashbox"}</TableHead>
+                      <TableHead>{t("systemBalance") || "System Balance"}</TableHead>
+                      <TableHead>{t("actualBalance") || "Actual Balance"}</TableHead>
+                      <TableHead>{t("difference") || "Difference"}</TableHead>
+                      <TableHead>{t("notes") || "Notes"}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reconciliations.map((rec: any) => {
+                      const diffUSD = parseFloat(rec.differenceUSD || "0");
+                      const diffLYD = parseFloat(rec.differenceLYD || "0");
+                      const safe = safes.find(s => s.id === rec.safeId);
+                      return (
+                        <TableRow key={rec.id}>
+                          <TableCell>{format(new Date(rec.createdAt), "MMM d, yyyy")}</TableCell>
+                          <TableCell>{safe?.name || rec.safeId}</TableCell>
+                          <TableCell>
+                            <div>${parseFloat(rec.systemBalanceUSD || "0").toFixed(2)}</div>
+                            <div className="text-xs text-blue-600">{parseFloat(rec.systemBalanceLYD || "0").toFixed(2)} LYD</div>
+                          </TableCell>
+                          <TableCell>
+                            <div>${parseFloat(rec.actualBalanceUSD || "0").toFixed(2)}</div>
+                            <div className="text-xs text-blue-600">{parseFloat(rec.actualBalanceLYD || "0").toFixed(2)} LYD</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className={diffUSD >= 0 ? "text-green-600" : "text-red-600"}>
+                              {diffUSD >= 0 ? "+" : ""}${diffUSD.toFixed(2)}
+                            </div>
+                            <div className={`text-xs ${diffLYD >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              {diffLYD >= 0 ? "+" : ""}{diffLYD.toFixed(2)} LYD
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{rec.notes || "-"}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="capital" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">{t("ownerAccountsCapital") || "Owner Accounts & Capital"}</h2>
+            <div className="flex gap-2">
+              <Dialog open={capitalTxDialogOpen} onOpenChange={setCapitalTxDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" data-testid="button-capital-transaction">
+                    <ArrowUpRight className="h-4 w-4 mr-2" />
+                    {t("capitalTransaction") || "Capital Transaction"}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t("addCapitalTransaction") || "Add Capital Transaction"}</DialogTitle>
+                  </DialogHeader>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.currentTarget);
+                      createCapitalTxMutation.mutate({
+                        ownerAccountId: formData.get("ownerAccountId") as string,
+                        type: formData.get("type") as string,
+                        amount: formData.get("amount") as string,
+                        currency: formData.get("currency") as string,
+                        safeId: formData.get("safeId") as string || undefined,
+                        description: formData.get("description") as string || undefined,
+                      });
+                    }}
+                    className="space-y-4"
+                  >
+                    <div className="space-y-2">
+                      <Label>{t("ownerAccount") || "Owner Account"}</Label>
+                      <Select name="ownerAccountId" required>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("selectOwner") || "Select owner"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ownerAccounts.map((acc: any) => (
+                            <SelectItem key={acc.id} value={acc.id}>{acc.ownerName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t("type") || "Type"}</Label>
+                        <Select name="type" required>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="injection">{t("capitalInjection") || "Capital Injection"}</SelectItem>
+                            <SelectItem value="withdrawal">{t("capitalWithdrawal") || "Capital Withdrawal"}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t("currency") || "Currency"}</Label>
+                        <Select name="currency" defaultValue="USD">
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="USD">USD</SelectItem>
+                            <SelectItem value="LYD">LYD</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("amount") || "Amount"}</Label>
+                      <Input name="amount" type="number" step="0.01" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("cashbox") || "Cashbox"}</Label>
+                      <Select name="safeId">
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("selectCashbox") || "Select cashbox"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">{t("noCashbox") || "No Cashbox"}</SelectItem>
+                          {safes.filter(s => s.isActive).map(safe => (
+                            <SelectItem key={safe.id} value={safe.id}>{safe.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("description") || "Description"}</Label>
+                      <Input name="description" />
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit" disabled={createCapitalTxMutation.isPending}>
+                        {createCapitalTxMutation.isPending ? t("saving") || "Saving..." : t("save") || "Save"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={ownerAccountDialogOpen} onOpenChange={setOwnerAccountDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-add-owner-account">
+                    <UserCircle className="h-4 w-4 mr-2" />
+                    {t("addOwnerAccount") || "Add Owner"}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t("createOwnerAccount") || "Create Owner Account"}</DialogTitle>
+                  </DialogHeader>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.currentTarget);
+                      createOwnerAccountMutation.mutate({
+                        ownerName: formData.get("ownerName") as string,
+                        currency: formData.get("currency") as string || "USD",
+                        notes: formData.get("notes") as string || undefined,
+                      });
+                    }}
+                    className="space-y-4"
+                  >
+                    <div className="space-y-2">
+                      <Label>{t("ownerName") || "Owner Name"}</Label>
+                      <Input name="ownerName" required data-testid="input-owner-name" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("currency") || "Currency"}</Label>
+                      <Select name="currency" defaultValue="USD">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="LYD">LYD</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("notes") || "Notes"}</Label>
+                      <Input name="notes" />
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit" disabled={createOwnerAccountMutation.isPending}>
+                        {createOwnerAccountMutation.isPending ? t("creating") || "Creating..." : t("create") || "Create"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {ownerAccounts.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-8">
+                  <UserCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">{t("noOwnerAccounts") || "No owner accounts created yet"}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {ownerAccounts.map((account: any) => (
+                <Card key={account.id} className="border-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <UserCircle className="h-5 w-5" />
+                      {account.ownerName}
+                    </CardTitle>
+                    <CardDescription>{account.notes || t("ownerAccount") || "Owner Account"}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">{t("capitalBalance") || "Capital Balance"}</span>
+                        <span className="text-xl font-bold text-green-600">
+                          {account.currency === "LYD" ? "" : "$"}{parseFloat(account.capitalBalance || "0").toFixed(2)} {account.currency === "LYD" ? "LYD" : ""}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">{t("personalBalance") || "Personal Balance"}</span>
+                        <span className="text-lg font-semibold">
+                          {account.currency === "LYD" ? "" : "$"}{parseFloat(account.personalBalance || "0").toFixed(2)} {account.currency === "LYD" ? "LYD" : ""}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -1390,12 +1390,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/expenses", requireOwner, async (req, res) => {
     try {
-      const result = insertExpenseSchema.safeParse(req.body);
+      const { safeId, currency, transactionType, ...expenseData } = req.body;
+      
+      const result = insertExpenseSchema.safeParse({
+        ...expenseData,
+        safeId: safeId || null,
+        currency: currency || "USD",
+        transactionType: transactionType || "outgoing",
+      });
       if (!result.success) {
         return res.status(400).json({ message: "Invalid expense data", errors: result.error.errors });
       }
 
       const expense = await storage.createExpense(result.data);
+      
+      // Deduct from safe if safeId is provided
+      if (safeId) {
+        const safes = await storage.getAllSafes();
+        const safe = safes.find(s => s.id === safeId);
+        if (safe) {
+          const amount = parseFloat(expenseData.amount);
+          const isOutgoing = transactionType !== "incoming";
+          const user = req.user as any;
+          
+          if (currency === "LYD") {
+            await storage.createSafeTransaction({
+              safeId,
+              type: isOutgoing ? "withdrawal" : "deposit",
+              amountUSD: "0",
+              amountLYD: String(amount),
+              description: `Expense: ${expenseData.personName} - ${expenseData.category}`,
+              createdByUserId: user.id,
+            });
+          } else {
+            await storage.createSafeTransaction({
+              safeId,
+              type: isOutgoing ? "withdrawal" : "deposit",
+              amountUSD: String(amount),
+              amountLYD: "0",
+              description: `Expense: ${expenseData.personName} - ${expenseData.category}`,
+              createdByUserId: user.id,
+            });
+          }
+        }
+      }
+
       res.status(201).json(expense);
     } catch (error) {
       res.status(500).json({ message: "Failed to create expense" });
@@ -1971,6 +2010,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(summary);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch financial summary" });
+    }
+  });
+
+  // Expense Categories
+  app.get("/api/expense-categories", requireAuth, async (req, res) => {
+    try {
+      const categories = await storage.getAllExpenseCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch expense categories" });
+    }
+  });
+
+  app.post("/api/expense-categories", requireOwner, async (req, res) => {
+    try {
+      const category = await storage.createExpenseCategory(req.body);
+      res.status(201).json(category);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create expense category" });
+    }
+  });
+
+  // Cashbox Reconciliation
+  app.get("/api/reconciliations", requireAuth, async (req, res) => {
+    try {
+      const reconciliations = await storage.getAllReconciliations();
+      res.json(reconciliations);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch reconciliations" });
+    }
+  });
+
+  app.post("/api/reconciliations", requireOwner, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { safeId, actualBalanceUSD, actualBalanceLYD, notes } = req.body;
+      
+      const safes = await storage.getAllSafes();
+      const safe = safes.find(s => s.id === safeId);
+      if (!safe) {
+        return res.status(404).json({ message: "Safe not found" });
+      }
+      
+      const systemUSD = parseFloat(String(safe.balanceUSD));
+      const systemLYD = parseFloat(String(safe.balanceLYD));
+      const actualUSD = parseFloat(actualBalanceUSD) || 0;
+      const actualLYD = parseFloat(actualBalanceLYD) || 0;
+      
+      const reconciliation = await storage.createReconciliation({
+        safeId,
+        systemBalanceUSD: String(systemUSD),
+        systemBalanceLYD: String(systemLYD),
+        actualBalanceUSD: String(actualUSD),
+        actualBalanceLYD: String(actualLYD),
+        differenceUSD: String(actualUSD - systemUSD),
+        differenceLYD: String(actualLYD - systemLYD),
+        notes: notes || null,
+        reconciledByUserId: user.id,
+      });
+      
+      res.status(201).json(reconciliation);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create reconciliation" });
+    }
+  });
+
+  // Owner Accounts
+  app.get("/api/owner-accounts", requireAuth, async (req, res) => {
+    try {
+      const accounts = await storage.getAllOwnerAccounts();
+      res.json(accounts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch owner accounts" });
+    }
+  });
+
+  app.post("/api/owner-accounts", requireOwner, async (req, res) => {
+    try {
+      const account = await storage.createOwnerAccount(req.body);
+      res.status(201).json(account);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create owner account" });
+    }
+  });
+
+  // Capital Transactions
+  app.get("/api/owner-accounts/:id/transactions", requireAuth, async (req, res) => {
+    try {
+      const transactions = await storage.getCapitalTransactions(req.params.id);
+      res.json(transactions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch capital transactions" });
+    }
+  });
+
+  app.post("/api/owner-accounts/:id/transactions", requireOwner, async (req, res) => {
+    try {
+      const { type, amount, currency, safeId, description } = req.body;
+      
+      const transaction = await storage.createCapitalTransaction({
+        ownerAccountId: req.params.id,
+        type,
+        amount: String(amount),
+        currency: currency || "USD",
+        safeId: safeId || null,
+        description: description || null,
+      });
+      
+      // Update owner account balance
+      const account = (await storage.getAllOwnerAccounts()).find(a => a.id === req.params.id);
+      if (account) {
+        const currentCapital = parseFloat(String(account.capitalBalance));
+        const txAmount = parseFloat(String(amount));
+        const newCapital = type === "injection" ? currentCapital + txAmount : currentCapital - txAmount;
+        await storage.updateOwnerAccount(req.params.id, { capitalBalance: String(newCapital) });
+      }
+      
+      res.status(201).json(transaction);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create capital transaction" });
     }
   });
 

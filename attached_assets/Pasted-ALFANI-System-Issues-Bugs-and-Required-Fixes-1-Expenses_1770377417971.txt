@@ -1,0 +1,238 @@
+ALFANI System – Issues, Bugs, and Required Fixes
+1. Expenses (المصروفات)
+Current Issues
+
+Expense records do not clearly define whether the transaction is:
+
+Incoming or outgoing
+
+No clear identification of:
+
+The entity being charged
+
+The entity receiving the amount
+
+Source of money is unclear
+
+Required Fix
+
+Every expense must be recorded as a double-sided accounting transaction:
+
+Debit (خصم)
+
+Credit (إضافة)
+
+When adding an expense, the system must require:
+
+Source of funds (cashbox, bank, external party)
+
+Currency (LYD or USD)
+
+Cashbox from which the amount is deducted
+
+Expenses must always affect a specific cashbox balance.
+
+2. Expense Categories (بنود الصرف)
+Current Issue
+
+Expense items are not properly categorized.
+
+Required Fix
+
+Each expense category must be linked to:
+
+A financial account
+
+A specific type (operational, administrative, etc.)
+
+Categories must be reusable and reportable.
+
+3. Receipts (الوصل / الإيصالات)
+Current Issues
+
+Receipts are not clearly reflected in the cashbox.
+
+No automatic receipt printing.
+
+Required Fix
+
+Every receipt must:
+
+Be recorded in the cashbox
+
+Show source, destination, amount, currency, and reason
+
+After confirmation, the system must:
+
+Automatically generate and allow printing of a receipt.
+
+4. Cashbox Reconciliation (تسوية الخزنة)
+Current Issue
+
+No proper cashbox reconciliation process.
+
+Required Fix
+
+Add a cashbox settlement feature that:
+
+Compares system balance with actual cash
+
+Records shortages or excesses
+
+Logs reconciliation history
+
+5. Order Status Workflow
+Required Standard Statuses
+
+Processing
+
+Arrived
+
+Received from Office
+
+Out to Delivery
+
+Office Collect
+
+Delivered
+
+Statuses must change only according to valid workflow rules.
+
+6. Orders to Other Cities
+Current Issue
+
+Cannot create an order unless down payment is defined.
+
+No clear option for down payment collection by shipping company.
+
+Required Fix
+
+Allow creating orders for other cities without blocking.
+
+Down payment options must include:
+
+Paid upfront
+
+Collected by shipping company
+
+Order creation should not fail due to down payment selection.
+
+7. Darib Assabil Shipping Error
+Current Bug
+
+When selecting “down payment collected by Darib Assabil”:
+
+Order status automatically changes to Delivered
+
+Required Fix
+
+This is incorrect behavior.
+
+Order status must remain:
+
+Processing or Out to Delivery
+
+Delivered status must only be set after confirmed delivery.
+
+8. Accounting Accounts Structure
+Current Issue
+
+Accounts are flat and not expandable.
+
+Required Fix
+
+Implement hierarchical accounts:
+
+Main accounts
+
+Sub-accounts (multi-level)
+
+Accounts must support reporting and aggregation.
+
+9. Owners’ Accounts & Capital
+Missing Features
+
+No personal accounts for owners
+
+No capital account
+
+Required Fix
+
+Add:
+
+Owner personal accounts
+
+Capital account
+
+Track:
+
+Capital injections
+
+Withdrawals
+
+Owner balances
+
+10. Revenues (الإيرادات)
+Current Issues
+
+Revenues are not clearly categorized.
+
+Required Fix
+
+Add revenue categories:
+
+Order revenues
+
+Exchange rate difference revenues
+
+External invoice clearance revenues
+
+Each revenue must be linked to:
+
+Account
+
+Currency
+
+Source
+
+11. Exchange Rate Adjustment in Orders
+Current Issue
+
+Exchange rate cannot be modified after order creation.
+
+Required Fix
+
+Allow exchange rate editing at order level.
+
+System must automatically recalculate:
+
+Profit
+
+Revenue
+
+Balances
+
+12. Financial Management Module
+Required Additions
+
+Create clear financial sections:
+
+Cashboxes
+
+Expenses
+
+Revenues
+
+Accounts
+
+Reconciliation
+
+Capital
+
+13. Mandatory Questions When Adding Expenses
+
+When adding any expense, the system must ask:
+
+Which cashbox will be deducted?
+
+Which currency is used (LYD or USD)?

@@ -411,9 +411,59 @@ export const expenses = pgTable("expenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   category: expenseCategoryEnum("category").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("USD"),
+  transactionType: text("transaction_type").notNull().default("outgoing"),
+  safeId: varchar("safe_id").references(() => safes.id),
   personName: text("person_name").notNull(),
   description: text("description"),
   date: timestamp("date").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const expenseCategories = pgTable("expense_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  type: text("type").notNull().default("operational"),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const cashboxReconciliations = pgTable("cashbox_reconciliations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  safeId: varchar("safe_id").notNull().references(() => safes.id),
+  systemBalanceUSD: decimal("system_balance_usd", { precision: 15, scale: 2 }).notNull(),
+  systemBalanceLYD: decimal("system_balance_lyd", { precision: 15, scale: 2 }).notNull(),
+  actualBalanceUSD: decimal("actual_balance_usd", { precision: 15, scale: 2 }).notNull(),
+  actualBalanceLYD: decimal("actual_balance_lyd", { precision: 15, scale: 2 }).notNull(),
+  differenceUSD: decimal("difference_usd", { precision: 15, scale: 2 }).notNull(),
+  differenceLYD: decimal("difference_lyd", { precision: 15, scale: 2 }).notNull(),
+  notes: text("notes"),
+  reconciledByUserId: varchar("reconciled_by_user_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const ownerAccounts = pgTable("owner_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerName: text("owner_name").notNull(),
+  capitalBalance: decimal("capital_balance", { precision: 15, scale: 2 }).notNull().default("0"),
+  personalBalance: decimal("personal_balance", { precision: 15, scale: 2 }).notNull().default("0"),
+  currency: text("currency").notNull().default("USD"),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const capitalTransactions = pgTable("capital_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerAccountId: varchar("owner_account_id").notNull().references(() => ownerAccounts.id),
+  type: text("type").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("USD"),
+  safeId: varchar("safe_id").references(() => safes.id),
+  description: text("description"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -481,6 +531,27 @@ export const insertDeliveryTaskSchema = createInsertSchema(deliveryTasks).omit({
 });
 
 export const insertExpenseSchema = createInsertSchema(expenses).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertExpenseCategorySchema = createInsertSchema(expenseCategories).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCashboxReconciliationSchema = createInsertSchema(cashboxReconciliations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertOwnerAccountSchema = createInsertSchema(ownerAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCapitalTransactionSchema = createInsertSchema(capitalTransactions).omit({
   id: true,
   createdAt: true,
 });
@@ -614,6 +685,18 @@ export type DeliveryTask = typeof deliveryTasks.$inferSelect;
 
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type Expense = typeof expenses.$inferSelect;
+
+export type InsertExpenseCategory = z.infer<typeof insertExpenseCategorySchema>;
+export type ExpenseCategory = typeof expenseCategories.$inferSelect;
+
+export type InsertCashboxReconciliation = z.infer<typeof insertCashboxReconciliationSchema>;
+export type CashboxReconciliation = typeof cashboxReconciliations.$inferSelect;
+
+export type InsertOwnerAccount = z.infer<typeof insertOwnerAccountSchema>;
+export type OwnerAccount = typeof ownerAccounts.$inferSelect;
+
+export type InsertCapitalTransaction = z.infer<typeof insertCapitalTransactionSchema>;
+export type CapitalTransaction = typeof capitalTransactions.$inferSelect;
 
 // Financial Module Types
 export type InsertRevenueAccount = z.infer<typeof insertRevenueAccountSchema>;
