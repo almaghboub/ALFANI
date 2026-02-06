@@ -72,7 +72,9 @@ export default function Login() {
           <div className="absolute bottom-20 right-20 w-96 h-96 bg-amber-400/5 rounded-full blur-3xl" />
         </div>
         <div className="relative z-10 flex flex-col justify-center items-center w-full px-16">
-          <img src={logoPath} alt="ALFANI Logo" className="h-40 w-auto mb-8 drop-shadow-2xl brightness-110" />
+          <div className="bg-white rounded-2xl p-4 shadow-2xl shadow-black/30 mb-8">
+            <img src={logoPath} alt="ALFANI Logo" className="h-28 w-auto" />
+          </div>
           <h1 className="text-4xl font-bold text-white mb-3 tracking-tight text-center">ALFANI</h1>
           <div className="w-16 h-1 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full mb-6" />
           <p className="text-white/50 text-sm uppercase tracking-[0.25em] font-medium text-center">Auto Parts & Accessories</p>
