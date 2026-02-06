@@ -51,7 +51,9 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
     <div className="flex flex-col h-full bg-[hsl(222,47%,11%)] text-white">
       <div className="px-6 py-5 border-b border-white/10">
         <div className="flex items-center justify-center">
-          <img src={logoPath} alt="ALFANI Logo" className="h-20 w-auto brightness-110 drop-shadow-lg" />
+          <div className="bg-white rounded-xl p-2 shadow-lg shadow-black/20">
+            <img src={logoPath} alt="ALFANI Logo" className="h-16 w-auto" />
+          </div>
         </div>
         <div className="mt-2 text-center">
           <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-medium">Auto Parts & Accessories</p>
