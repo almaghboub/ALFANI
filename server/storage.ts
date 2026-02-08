@@ -283,6 +283,9 @@ export interface IStorage {
   getAllInvoices(): Promise<SalesInvoiceWithItems[]>;
   getInvoice(id: string): Promise<SalesInvoiceWithItems | undefined>;
   createInvoice(invoice: InsertSalesInvoice, items: InsertInvoiceItem[]): Promise<SalesInvoiceWithItems>;
+  updateInvoice(id: string, invoice: Partial<InsertSalesInvoice>, items?: InsertInvoiceItem[]): Promise<SalesInvoiceWithItems | undefined>;
+  deleteInvoice(id: string): Promise<boolean>;
+  returnInvoiceItems(invoiceId: string, returnItems: Array<{itemId: string; quantity: number}>): Promise<SalesInvoiceWithItems | undefined>;
   generateInvoiceNumber(): Promise<string>;
   checkInvoiceStock(branch: string, items: Array<{productId: string; quantity: number}>): Promise<{success: boolean; message?: string}>;
 
@@ -2032,6 +2035,114 @@ export class PostgreSQLStorage implements IStorage {
     return `${datePrefix}-${String(nextNum).padStart(4, '0')}`;
   }
   
+  async updateInvoice(id: string, invoiceData: Partial<InsertSalesInvoice>, newItems?: InsertInvoiceItem[]): Promise<SalesInvoiceWithItems | undefined> {
+    const existing = await db.select().from(salesInvoices).where(eq(salesInvoices.id, id));
+    if (existing.length === 0) return undefined;
+
+    const oldInvoice = existing[0];
+
+    if (newItems && newItems.length > 0) {
+      const oldItems = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+      for (const oldItem of oldItems) {
+        const inv = await db.select().from(branchInventory)
+          .where(sql`${branchInventory.productId} = ${oldItem.productId} AND ${branchInventory.branch} = ${oldInvoice.branch}`);
+        if (inv.length > 0) {
+          await db.update(branchInventory)
+            .set({ quantity: inv[0].quantity + oldItem.quantity, updatedAt: new Date() })
+            .where(eq(branchInventory.id, inv[0].id));
+        }
+      }
+
+      await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+
+      const branch = invoiceData.branch || oldInvoice.branch;
+      const itemsWithId = newItems.map(item => ({ ...item, invoiceId: id }));
+      const createdItems = await db.insert(invoiceItems).values(itemsWithId).returning();
+
+      for (const item of newItems) {
+        const inv = await db.select().from(branchInventory)
+          .where(sql`${branchInventory.productId} = ${item.productId} AND ${branchInventory.branch} = ${branch}`);
+        if (inv.length > 0) {
+          const newQty = Math.max(0, inv[0].quantity - item.quantity);
+          await db.update(branchInventory)
+            .set({ quantity: newQty, updatedAt: new Date() })
+            .where(eq(branchInventory.id, inv[0].id));
+        }
+      }
+    }
+
+    const [updated] = await db.update(salesInvoices).set(invoiceData).where(eq(salesInvoices.id, id)).returning();
+    const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+    return { ...updated, items };
+  }
+
+  async deleteInvoice(id: string): Promise<boolean> {
+    const existing = await db.select().from(salesInvoices).where(eq(salesInvoices.id, id));
+    if (existing.length === 0) return false;
+
+    const invoice = existing[0];
+    const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+
+    for (const item of items) {
+      const inv = await db.select().from(branchInventory)
+        .where(sql`${branchInventory.productId} = ${item.productId} AND ${branchInventory.branch} = ${invoice.branch}`);
+      if (inv.length > 0) {
+        await db.update(branchInventory)
+          .set({ quantity: inv[0].quantity + item.quantity, updatedAt: new Date() })
+          .where(eq(branchInventory.id, inv[0].id));
+      }
+    }
+
+    await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+    await db.delete(salesInvoices).where(eq(salesInvoices.id, id));
+    return true;
+  }
+
+  async returnInvoiceItems(invoiceId: string, returnItems: Array<{itemId: string; quantity: number}>): Promise<SalesInvoiceWithItems | undefined> {
+    const existing = await db.select().from(salesInvoices).where(eq(salesInvoices.id, invoiceId));
+    if (existing.length === 0) return undefined;
+
+    const invoice = existing[0];
+
+    for (const ret of returnItems) {
+      const [item] = await db.select().from(invoiceItems).where(eq(invoiceItems.id, ret.itemId));
+      if (!item) continue;
+
+      if (ret.quantity >= item.quantity) {
+        await db.delete(invoiceItems).where(eq(invoiceItems.id, ret.itemId));
+      } else {
+        const newQty = item.quantity - ret.quantity;
+        const newLineTotal = newQty * Number(item.unitPrice);
+        await db.update(invoiceItems)
+          .set({ quantity: newQty, lineTotal: String(newLineTotal) })
+          .where(eq(invoiceItems.id, ret.itemId));
+      }
+
+      const inv = await db.select().from(branchInventory)
+        .where(sql`${branchInventory.productId} = ${item.productId} AND ${branchInventory.branch} = ${invoice.branch}`);
+      if (inv.length > 0) {
+        await db.update(branchInventory)
+          .set({ quantity: inv[0].quantity + ret.quantity, updatedAt: new Date() })
+          .where(eq(branchInventory.id, inv[0].id));
+      }
+    }
+
+    const remainingItems = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+    
+    if (remainingItems.length === 0) {
+      await db.delete(salesInvoices).where(eq(salesInvoices.id, invoiceId));
+      return undefined;
+    }
+
+    const newTotal = remainingItems.reduce((sum, item) => sum + Number(item.lineTotal), 0);
+    const [updated] = await db.update(salesInvoices)
+      .set({ totalAmount: String(newTotal) })
+      .where(eq(salesInvoices.id, invoiceId))
+      .returning();
+
+    return { ...updated, items: remainingItems };
+  }
+
   async checkInvoiceStock(branch: string, items: Array<{productId: string; quantity: number}>): Promise<{success: boolean; message?: string}> {
     for (const item of items) {
       const inv = await db.select().from(branchInventory)

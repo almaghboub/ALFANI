@@ -1,14 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { History, Printer, Eye, Search } from "lucide-react";
+import { History, Printer, Eye, Search, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Header } from "@/components/header";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { SalesInvoiceWithItems } from "@shared/schema";
 import logoPath from "@assets/alfani-logo.png";
 
@@ -35,11 +39,23 @@ function getLogoBase64(src: string): Promise<string> {
 
 export default function Sales() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoiceWithItems | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [logoBase64, setLogoBase64] = useState<string>(logoPath);
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editCustomerName, setEditCustomerName] = useState("");
+  const [editBranch, setEditBranch] = useState<"ALFANI1" | "ALFANI2">("ALFANI1");
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<SalesInvoiceWithItems | null>(null);
+
+  const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false);
+  const [returnInvoice, setReturnInvoice] = useState<SalesInvoiceWithItems | null>(null);
+  const [returnQuantities, setReturnQuantities] = useState<Record<string, number>>({});
 
   useEffect(() => {
     getLogoBase64(logoPath).then(setLogoBase64);
@@ -47,6 +63,55 @@ export default function Sales() {
 
   const { data: invoices = [], isLoading } = useQuery<SalesInvoiceWithItems[]>({
     queryKey: ["/api/invoices"],
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await apiRequest("PUT", `/api/invoices/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      setIsEditDialogOpen(false);
+      toast({ title: t("invoiceUpdated") });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update invoice", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/invoices/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      setIsDeleteDialogOpen(false);
+      setInvoiceToDelete(null);
+      toast({ title: t("invoiceDeleted") });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete invoice", variant: "destructive" });
+    },
+  });
+
+  const returnMutation = useMutation({
+    mutationFn: async ({ id, returnItems }: { id: string; returnItems: Array<{itemId: string; quantity: number}> }) => {
+      const res = await apiRequest("POST", `/api/invoices/${id}/return`, { returnItems });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
+      setIsReturnDialogOpen(false);
+      setReturnInvoice(null);
+      setReturnQuantities({});
+      toast({ title: t("returnSuccess") });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to process return", variant: "destructive" });
+    },
   });
 
   const filteredInvoices = invoices.filter(invoice =>
@@ -57,6 +122,51 @@ export default function Sales() {
   const handleView = (invoice: SalesInvoiceWithItems) => {
     setSelectedInvoice(invoice);
     setIsViewDialogOpen(true);
+  };
+
+  const handleEdit = (invoice: SalesInvoiceWithItems) => {
+    setSelectedInvoice(invoice);
+    setEditCustomerName(invoice.customerName);
+    setEditBranch(invoice.branch as "ALFANI1" | "ALFANI2");
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditSave = () => {
+    if (!selectedInvoice) return;
+    editMutation.mutate({
+      id: selectedInvoice.id,
+      data: { customerName: editCustomerName, branch: editBranch },
+    });
+  };
+
+  const handleDeleteClick = (invoice: SalesInvoiceWithItems) => {
+    setInvoiceToDelete(invoice);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!invoiceToDelete) return;
+    deleteMutation.mutate(invoiceToDelete.id);
+  };
+
+  const handleReturnClick = (invoice: SalesInvoiceWithItems) => {
+    setReturnInvoice(invoice);
+    const quantities: Record<string, number> = {};
+    invoice.items.forEach(item => { quantities[item.id] = 0; });
+    setReturnQuantities(quantities);
+    setIsReturnDialogOpen(true);
+  };
+
+  const handleReturnProcess = () => {
+    if (!returnInvoice) return;
+    const returnItems = Object.entries(returnQuantities)
+      .filter(([_, qty]) => qty > 0)
+      .map(([itemId, quantity]) => ({ itemId, quantity }));
+    if (returnItems.length === 0) {
+      toast({ title: t("noItemsToReturn"), variant: "destructive" });
+      return;
+    }
+    returnMutation.mutate({ id: returnInvoice.id, returnItems });
   };
 
   const handlePrint = (invoice: SalesInvoiceWithItems) => {
@@ -524,12 +634,21 @@ export default function Sales() {
                         <TableCell className="font-semibold">{Number(invoice.totalAmount).toFixed(2)} LYD</TableCell>
                         <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleView(invoice)} data-testid={`button-view-${invoice.id}`}>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="outline" onClick={() => handleView(invoice)} data-testid={`button-view-${invoice.id}`} title={t("invoiceDetails")}>
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => handlePrint(invoice)} data-testid={`button-print-${invoice.id}`}>
+                            <Button size="sm" variant="outline" onClick={() => handlePrint(invoice)} data-testid={`button-print-${invoice.id}`} title={t("print")}>
                               <Printer className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(invoice)} data-testid={`button-edit-${invoice.id}`} title={t("editInvoice")}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleReturnClick(invoice)} data-testid={`button-return-${invoice.id}`} title={t("returnProducts")} className="text-amber-600 hover:text-amber-700">
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleDeleteClick(invoice)} data-testid={`button-delete-${invoice.id}`} title={t("deleteInvoice")} className="text-red-600 hover:text-red-700">
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -603,6 +722,174 @@ export default function Sales() {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("editInvoice")}</DialogTitle>
+            <DialogDescription>
+              {selectedInvoice?.invoiceNumber}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>{t("customerName")}</Label>
+              <Input
+                value={editCustomerName}
+                onChange={(e) => setEditCustomerName(e.target.value)}
+                data-testid="input-edit-customer-name"
+              />
+            </div>
+            <div>
+              <Label>{t("branch")}</Label>
+              <Select value={editBranch} onValueChange={(v) => setEditBranch(v as "ALFANI1" | "ALFANI2")}>
+                <SelectTrigger data-testid="select-edit-branch">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALFANI1">ALFANI 1</SelectItem>
+                  <SelectItem value="ALFANI2">ALFANI 2</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} data-testid="button-cancel-edit">
+              {t("cancel")}
+            </Button>
+            <Button onClick={handleEditSave} disabled={editMutation.isPending || !editCustomerName.trim()} data-testid="button-save-edit">
+              {editMutation.isPending ? t("loading") : t("save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">{t("deleteInvoice")}</DialogTitle>
+            <DialogDescription>
+              {t("deleteInvoiceConfirm")}
+            </DialogDescription>
+          </DialogHeader>
+          {invoiceToDelete && (
+            <div className="p-4 bg-muted rounded-md space-y-1">
+              <p className="font-mono text-sm">{invoiceToDelete.invoiceNumber}</p>
+              <p className="text-sm">{invoiceToDelete.customerName}</p>
+              <p className="text-sm font-semibold">{Number(invoiceToDelete.totalAmount).toFixed(2)} LYD</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} data-testid="button-cancel-delete">
+              {t("cancel")}
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={deleteMutation.isPending} data-testid="button-confirm-delete">
+              {deleteMutation.isPending ? t("loading") : t("deleteInvoice")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isReturnDialogOpen} onOpenChange={setIsReturnDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-amber-600" />
+              {t("returnProducts")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("returnProductsDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          {returnInvoice && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 p-3 bg-muted rounded-md">
+                <div>
+                  <p className="text-xs text-muted-foreground">{t("invoiceNumber")}</p>
+                  <p className="font-mono text-sm">{returnInvoice.invoiceNumber}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t("customerName")}</p>
+                  <p className="text-sm">{returnInvoice.customerName}</p>
+                </div>
+              </div>
+
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("product")}</TableHead>
+                      <TableHead className="text-center">{t("quantity")}</TableHead>
+                      <TableHead className="text-center">{t("unitPrice")}</TableHead>
+                      <TableHead className="text-center">{t("returnQuantity")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {returnInvoice.items.map(item => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.productName}</TableCell>
+                        <TableCell className="text-center">{item.quantity}</TableCell>
+                        <TableCell className="text-center">{Number(item.unitPrice).toFixed(2)} LYD</TableCell>
+                        <TableCell className="text-center">
+                          <Input
+                            type="number"
+                            min={0}
+                            max={item.quantity}
+                            value={returnQuantities[item.id] || 0}
+                            onChange={(e) => {
+                              const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), item.quantity);
+                              setReturnQuantities(prev => ({ ...prev, [item.id]: val }));
+                            }}
+                            className="w-20 text-center mx-auto"
+                            data-testid={`input-return-qty-${item.id}`}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-muted-foreground">
+                  {Object.values(returnQuantities).filter(q => q > 0).length > 0 && (
+                    <span>
+                      {Object.values(returnQuantities).reduce((s, q) => s + q, 0)} {t("items")} {t("returnProducts").toLowerCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const allMax: Record<string, number> = {};
+                      returnInvoice.items.forEach(item => { allMax[item.id] = item.quantity; });
+                      setReturnQuantities(allMax);
+                    }}
+                    data-testid="button-return-all"
+                  >
+                    {t("fullReturn")}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsReturnDialogOpen(false)} data-testid="button-cancel-return">
+              {t("cancel")}
+            </Button>
+            <Button
+              onClick={handleReturnProcess}
+              disabled={returnMutation.isPending || Object.values(returnQuantities).every(q => q === 0)}
+              className="bg-amber-600 hover:bg-amber-700"
+              data-testid="button-confirm-return"
+            >
+              {returnMutation.isPending ? t("loading") : t("processReturn")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

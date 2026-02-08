@@ -2269,6 +2269,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/invoices/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { customerName, branch, items } = req.body;
+
+      const existingInvoice = await storage.getInvoice(id);
+      if (!existingInvoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      const invoiceData: any = {};
+      if (customerName && typeof customerName === 'string') {
+        invoiceData.customerName = customerName.trim();
+      }
+
+      const branchChanged = branch && (branch === 'ALFANI1' || branch === 'ALFANI2') && branch !== existingInvoice.branch;
+
+      let itemsData: any[] | undefined;
+      if (branchChanged) {
+        invoiceData.branch = branch;
+        itemsData = existingInvoice.items.map(item => ({
+          invoiceId: id,
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: String(item.unitPrice),
+          lineTotal: String(item.lineTotal),
+        }));
+      } else if (items && Array.isArray(items) && items.length > 0) {
+        itemsData = items.map((item: any) => {
+          const lineTotal = item.quantity * item.unitPrice;
+          return {
+            invoiceId: id,
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: String(item.unitPrice),
+            lineTotal: String(lineTotal),
+          };
+        });
+        const totalAmount = itemsData.reduce((sum: number, item: any) => sum + parseFloat(item.lineTotal), 0);
+        invoiceData.totalAmount = String(totalAmount);
+      }
+
+      const invoice = await storage.updateInvoice(id, invoiceData, itemsData);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error("Failed to update invoice:", error);
+      res.status(500).json({ message: "Failed to update invoice" });
+    }
+  });
+
+  app.delete("/api/invoices/:id", requireAuth, async (req, res) => {
+    try {
+      const success = await storage.deleteInvoice(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      res.json({ message: "Invoice deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete invoice:", error);
+      res.status(500).json({ message: "Failed to delete invoice" });
+    }
+  });
+
+  app.post("/api/invoices/:id/return", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { returnItems } = req.body;
+
+      if (!returnItems || !Array.isArray(returnItems) || returnItems.length === 0) {
+        return res.status(400).json({ message: "Return items are required" });
+      }
+
+      for (const item of returnItems) {
+        if (!item.itemId || typeof item.quantity !== 'number' || item.quantity <= 0) {
+          return res.status(400).json({ message: "Invalid return item data" });
+        }
+      }
+
+      const existingInvoice = await storage.getInvoice(id);
+      if (!existingInvoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      for (const ret of returnItems) {
+        const invoiceItem = existingInvoice.items.find(i => i.id === ret.itemId);
+        if (!invoiceItem) {
+          return res.status(400).json({ message: `Item ${ret.itemId} not found in invoice` });
+        }
+        if (ret.quantity > invoiceItem.quantity) {
+          return res.status(400).json({ message: `Return quantity (${ret.quantity}) exceeds sold quantity (${invoiceItem.quantity}) for ${invoiceItem.productName}` });
+        }
+      }
+
+      const result = await storage.returnInvoiceItems(id, returnItems);
+      if (result === undefined) {
+        const existing = await storage.getInvoice(id);
+        if (!existing) {
+          return res.json({ message: "All items returned. Invoice removed.", deleted: true });
+        }
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to process return:", error);
+      res.status(500).json({ message: "Failed to process return" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
