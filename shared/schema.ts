@@ -220,10 +220,10 @@ export const branchEnum = pgEnum("branch", ["ALFANI1", "ALFANI2"]);
 export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  sku: text("sku").notNull().unique(),
+  sku: text("sku").unique(),
   category: text("category"),
   description: text("description"),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).default("0"),
   costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),

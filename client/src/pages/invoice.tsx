@@ -115,8 +115,8 @@ export default function Invoice() {
         productId: product.id,
         productName: product.name,
         quantity: 1,
-        unitPrice: Number(product.price),
-        lineTotal: Number(product.price),
+        unitPrice: Number(product.price || 0),
+        lineTotal: Number(product.price || 0),
       }]);
     }
   };
@@ -520,7 +520,7 @@ export default function Invoice() {
   const filteredProducts = products.filter(product => 
     product.isActive && 
     (product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-     product.sku.toLowerCase().includes(searchQuery.toLowerCase()))
+     (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
   const getAvailableQuantity = (product: ProductWithInventory) => {
@@ -582,8 +582,8 @@ export default function Invoice() {
                     {filteredProducts.map(product => (
                       <TableRow key={product.id}>
                         <TableCell>{product.name}</TableCell>
-                        <TableCell>{product.sku}</TableCell>
-                        <TableCell>{Number(product.price).toFixed(2)} LYD</TableCell>
+                        <TableCell>{product.sku || "-"}</TableCell>
+                        <TableCell>{Number(product.price || 0).toFixed(2)} LYD</TableCell>
                         <TableCell>{getAvailableQuantity(product)}</TableCell>
                         <TableCell>
                           <Button

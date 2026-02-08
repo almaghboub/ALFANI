@@ -86,7 +86,7 @@ export default function Inventory() {
   const filteredProducts = productsWithInventory.filter(
     (product) =>
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.sku.toLowerCase().includes(searchQuery.toLowerCase())
+      (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const getLowStockCount = (branch: Branch) => {
@@ -139,9 +139,9 @@ export default function Inventory() {
             return (
               <TableRow key={product.id} data-testid={`row-inventory-${product.id}-${branch}`}>
                 <TableCell className="font-medium">{product.name}</TableCell>
-                <TableCell>{product.sku}</TableCell>
+                <TableCell>{product.sku || "-"}</TableCell>
                 <TableCell>{product.category || "-"}</TableCell>
-                <TableCell>{parseFloat(product.price).toFixed(2)} LYD</TableCell>
+                <TableCell>{parseFloat(product.price || "0").toFixed(2)} LYD</TableCell>
                 <TableCell>{quantity}</TableCell>
                 <TableCell>
                   {isOutOfStock ? (
@@ -293,7 +293,7 @@ export default function Inventory() {
             {selectedProduct && (
               <div className="p-3 bg-muted rounded-lg">
                 <p className="font-medium">{selectedProduct.name}</p>
-                <p className="text-sm text-muted-foreground">SKU: {selectedProduct.sku}</p>
+                <p className="text-sm text-muted-foreground">SKU: {selectedProduct.sku || "-"}</p>
               </div>
             )}
             <div className="grid gap-2">

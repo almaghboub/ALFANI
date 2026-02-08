@@ -1490,6 +1490,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/products", requireAuth, async (req, res) => {
     try {
       const { branch, initialQuantity, ...productData } = req.body;
+      
+      if (!productData.name || productData.name.trim() === '') {
+        return res.status(400).json({ message: "Product name is required" });
+      }
+      
+      if (!productData.sku || productData.sku.trim() === '') {
+        productData.sku = `SKU-${Date.now()}`;
+      }
+      if (!productData.price || productData.price === '' || productData.price === '0') {
+        productData.price = "0";
+      }
+      
       const result = insertProductSchema.safeParse(productData);
       if (!result.success) {
         return res.status(400).json({ message: "Invalid product data", errors: result.error.errors });

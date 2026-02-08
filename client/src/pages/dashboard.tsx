@@ -374,7 +374,7 @@ export default function Dashboard() {
                     <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200/50 dark:border-red-800/30" data-testid={`alert-outofstock-${p.id}`}>
                       <div>
                         <p className="font-medium text-sm">{p.name}</p>
-                        <p className="text-[11px] text-muted-foreground">{p.sku}</p>
+                        <p className="text-[11px] text-muted-foreground">{p.sku || "-"}</p>
                       </div>
                       <Badge variant="destructive" className="text-[10px] font-semibold">{t('outOfStock') || "Out of Stock"}</Badge>
                     </div>
@@ -385,7 +385,7 @@ export default function Dashboard() {
                       <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/30" data-testid={`alert-lowstock-${p.id}`}>
                         <div>
                           <p className="font-medium text-sm">{p.name}</p>
-                          <p className="text-[11px] text-muted-foreground">{p.sku}</p>
+                          <p className="text-[11px] text-muted-foreground">{p.sku || "-"}</p>
                         </div>
                         <Badge variant="outline" className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700">
                           {qty} {t('remaining') || "remaining"}
