@@ -1496,7 +1496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (!productData.sku || productData.sku.trim() === '') {
-        productData.sku = `SKU-${Date.now()}`;
+        delete productData.sku;
       }
       if (!productData.price || productData.price === '' || productData.price === '0') {
         productData.price = "0";
