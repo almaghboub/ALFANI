@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/header";
 import type { SalesInvoiceWithItems } from "@shared/schema";
-import logoPath from "@assets/ALFANI-removebg-preview_1768829603636.png";
+import logoPath from "@assets/alfani-logo.png";
 
 function getLogoBase64(src: string): Promise<string> {
   return new Promise((resolve) => {

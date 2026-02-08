@@ -12,7 +12,7 @@ import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Product, ProductWithInventory } from "@shared/schema";
-import logoPath from "@assets/ALFANI-removebg-preview_1768829603636.png";
+import logoPath from "@assets/alfani-logo.png";
 
 interface CartItem {
   productId: string;
