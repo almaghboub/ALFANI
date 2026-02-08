@@ -63,13 +63,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         checkPeriod: 86400000, // prune expired entries every 24h
       }),
       secret: process.env.SESSION_SECRET || "your-secret-key",
-      resave: false,
+      resave: true,
       saveUninitialized: false,
       cookie: {
         secure: isProduction,
         httpOnly: true,
         sameSite: 'lax',
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        path: '/',
       },
     })
   );
