@@ -15,6 +15,10 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Product, InsertProduct } from "@shared/schema";
 
+interface ProductWithInventory extends Product {
+  branchInventory?: Array<{ branch: string; quantity: number; lowStockThreshold: number }>;
+}
+
 export default function Products() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -22,7 +26,7 @@ export default function Products() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ProductWithInventory | null>(null);
   const [formData, setFormData] = useState<Partial<InsertProduct> & { branch?: string; initialQuantity?: number }>({
     name: "",
     sku: "",
@@ -35,8 +39,8 @@ export default function Products() {
     initialQuantity: 0,
   });
 
-  const { data: products = [], isLoading } = useQuery<Product[]>({
-    queryKey: ["/api/products"],
+  const { data: products = [], isLoading } = useQuery<ProductWithInventory[]>({
+    queryKey: ["/api/products/with-inventory"],
   });
 
   const createMutation = useMutation({
@@ -63,6 +67,7 @@ export default function Products() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
       setIsEditDialogOpen(false);
       setSelectedProduct(null);
       resetForm();
@@ -79,6 +84,7 @@ export default function Products() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
       setIsDeleteDialogOpen(false);
       setSelectedProduct(null);
       toast({ title: t("success"), description: t("productDeleted") });
@@ -102,8 +108,10 @@ export default function Products() {
     });
   };
 
-  const handleEdit = (product: Product) => {
+  const handleEdit = (product: ProductWithInventory) => {
     setSelectedProduct(product);
+    const firstBranch = product.branchInventory?.[0];
+    const totalQty = product.branchInventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
     setFormData({
       name: product.name,
       sku: product.sku,
@@ -112,8 +120,8 @@ export default function Products() {
       price: product.price,
       costPrice: product.costPrice || "0",
       isActive: product.isActive,
-      branch: "ALFANI1",
-      initialQuantity: 0,
+      branch: firstBranch?.branch || "ALFANI1",
+      initialQuantity: totalQty,
     });
     setIsEditDialogOpen(true);
   };
@@ -125,8 +133,7 @@ export default function Products() {
 
   const handleSubmit = () => {
     if (isEditDialogOpen && selectedProduct) {
-      const { branch, initialQuantity, ...productData } = formData;
-      updateMutation.mutate({ id: selectedProduct.id, data: productData as InsertProduct });
+      updateMutation.mutate({ id: selectedProduct.id, data: formData as InsertProduct });
     } else {
       createMutation.mutate(formData as InsertProduct & { branch: string; initialQuantity: number });
     }
@@ -190,6 +197,7 @@ export default function Products() {
                   <TableHead>{t("category")}</TableHead>
                   <TableHead>{t("price")}</TableHead>
                   <TableHead>{t("costPrice")}</TableHead>
+                  <TableHead>{t("quantity")}</TableHead>
                   <TableHead>{t("status")}</TableHead>
                   <TableHead>{t("actions")}</TableHead>
                 </TableRow>
@@ -202,6 +210,16 @@ export default function Products() {
                     <TableCell>{product.category || "-"}</TableCell>
                     <TableCell>${parseFloat(product.price).toFixed(2)}</TableCell>
                     <TableCell>${parseFloat(product.costPrice || "0").toFixed(2)}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const totalQty = product.branchInventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
+                        return (
+                          <span className={`font-semibold ${totalQty === 0 ? 'text-red-500' : totalQty <= 5 ? 'text-amber-500' : 'text-foreground'}`}>
+                            {totalQty}
+                          </span>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={product.isActive ? "default" : "secondary"}>
                         {product.isActive ? t("active") : t("inactive")}
@@ -248,23 +266,21 @@ export default function Products() {
             <DialogTitle>{isEditDialogOpen ? t("editProduct") : t("addProduct")}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            {!isEditDialogOpen && (
-              <div className="grid gap-2">
-                <Label>{t("branch")} *</Label>
-                <Select
-                  value={formData.branch || "ALFANI1"}
-                  onValueChange={(value) => setFormData({ ...formData, branch: value })}
-                >
-                  <SelectTrigger data-testid="select-product-branch">
-                    <SelectValue placeholder={t("selectBranch")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALFANI1">{t("ALFANI1")}</SelectItem>
-                    <SelectItem value="ALFANI2">{t("ALFANI2")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="grid gap-2">
+              <Label>{t("branch")} *</Label>
+              <Select
+                value={formData.branch || "ALFANI1"}
+                onValueChange={(value) => setFormData({ ...formData, branch: value })}
+              >
+                <SelectTrigger data-testid="select-product-branch">
+                  <SelectValue placeholder={t("selectBranch")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALFANI1">{t("ALFANI1")}</SelectItem>
+                  <SelectItem value="ALFANI2">{t("ALFANI2")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="name">{t("productName")} *</Label>
               <Input
@@ -295,7 +311,7 @@ export default function Products() {
                 data-testid="input-product-category"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="costPrice">{t("buyingPrice")} *</Label>
                 <Input
@@ -318,19 +334,18 @@ export default function Products() {
                   data-testid="input-product-price"
                 />
               </div>
-            </div>
-            {!isEditDialogOpen && (
               <div className="grid gap-2">
-                <Label htmlFor="initialQuantity">{t("initialQuantity")}</Label>
+                <Label htmlFor="initialQuantity">{t("quantity")} *</Label>
                 <Input
                   id="initialQuantity"
                   type="number"
+                  min="0"
                   value={formData.initialQuantity || 0}
                   onChange={(e) => setFormData({ ...formData, initialQuantity: parseInt(e.target.value) || 0 })}
                   data-testid="input-product-initial-quantity"
                 />
               </div>
-            )}
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="description">{t("description")}</Label>
               <Input

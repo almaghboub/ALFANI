@@ -1,0 +1,83 @@
+2318|        lowStockThreshold: "حد المخزون المنخفض",
+2319|        updateStock: "تحديث المخزون",
+[plugin:vite:esbuild] [plugin vite:esbuild] client/src/i18n.ts: Duplicate key "lowStockThreshold" in object literal
+2316|        initialQuantity: "الكمية الأولية",
+2317|        quantity: "الكمية",
+2318|        lowStockThreshold: "حد المخزون المنخفض",
+   |        ^
+2319|        updateStock: "تحديث المخزون",
+2320|        inventoryUpdated: "تم تحديث المخزون بنجاح",
+[plugin:vite:esbuild] [plugin vite:esbuild] client/src/i18n.ts: Duplicate key "updateStock" in object literal
+2317|        quantity: "الكمية",
+2318|        lowStockThreshold: "حد المخزون المنخفض",
+2319|        updateStock: "تحديث المخزون",
+   |        ^
+2320|        inventoryUpdated: "تم تحديث المخزون بنجاح",
+2321|        failedUpdateInventory: "فشل في تحديث المخزون",
+[plugin:vite:esbuild] [plugin vite:esbuild] client/src/i18n.ts: Duplicate key "lowStock" in object literal
+2320|        inventoryUpdated: "تم تحديث المخزون بنجاح",
+2321|        failedUpdateInventory: "فشل في تحديث المخزون",
+2322|        lowStock: "مخزون منخفض",
+   |        ^
+2323|        inStock: "متوفر",
+2324|        outOfStock: "غير متوفر",
+[plugin:vite:esbuild] [plugin vite:esbuild] client/src/i18n.ts: Duplicate key "inStock" in object literal
+2321|        failedUpdateInventory: "فشل في تحديث المخزون",
+2322|        lowStock: "مخزون منخفض",
+2323|        inStock: "متوفر",
+   |        ^
+2324|        outOfStock: "غير متوفر",
+2325|        totalStock: "إجمالي المخزون",
+[plugin:vite:esbuild] [plugin vite:esbuild] client/src/i18n.ts: Duplicate key "outOfStock" in object literal
+2322|        lowStock: "مخزون منخفض",
+2323|        inStock: "متوفر",
+2324|        outOfStock: "غير متوفر",
+   |        ^
+2325|        totalStock: "إجمالي المخزون",
+2326|        acrossAllBranches: "عبر جميع الفروع",
+✓ 2984 modules transformed.
+rendering chunks...
+computing gzip size...
+../dist/public/index.html                                                     1.97 kB │ gzip:   0.75 kB
+../dist/public/assets/ALFANI-removebg-preview_1768829603636-C6mGjEFu.png     16.05 kB
+../dist/public/assets/alfani-logo-CNeRdS2c.png                               60.52 kB
+../dist/public/assets/index-DvFrUTlY.css                                     84.69 kB │ gzip:  14.64 kB
+../dist/public/assets/index-DOTCoK5Z.js                                   1,204.10 kB │ gzip: 337.86 kB
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 7.92s
+  dist/index.js  145.5kb
+⚡ Done in 12ms
+==> Uploading build...
+==> Uploaded in 7.5s. Compression took 3.7s
+==> Build successful 🎉
+==> Deploying...
+==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+file:///opt/render/project/src/dist/index.js:683
+  throw new Error(
+        ^
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///opt/render/project/src/dist/index.js:683:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+Node.js v22.22.0
+==> Exited with status 1
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+file:///opt/render/project/src/dist/index.js:683
+  throw new Error(
+        ^
+Error: DATABASE_URL must be set. Did you forget to provision a database?
+    at file:///opt/render/project/src/dist/index.js:683:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+Node.js v22.22.0

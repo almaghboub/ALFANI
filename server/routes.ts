@@ -1520,10 +1520,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/products/:id", requireAuth, async (req, res) => {
     try {
-      const product = await storage.updateProduct(req.params.id, req.body);
+      const { branch, initialQuantity, ...productData } = req.body;
+      const product = await storage.updateProduct(req.params.id, productData);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
+
+      if (branch && initialQuantity !== undefined) {
+        await storage.upsertBranchInventory({
+          productId: product.id,
+          branch,
+          quantity: parseInt(initialQuantity) || 0,
+          lowStockThreshold: 5,
+        });
+      }
+
       res.json(product);
     } catch (error) {
       res.status(500).json({ message: "Failed to update product" });
