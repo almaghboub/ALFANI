@@ -55,7 +55,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Session configuration with PostgreSQL store (survives server restarts)
   const PgStore = pgSession(session);
   
-  app.set('trust proxy', true);
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  app.set('trust proxy', 1);
   app.use(
     session({
       store: new PgStore({
@@ -67,7 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: false,
+        secure: isProduction,
         httpOnly: true,
         sameSite: 'lax',
         maxAge: 24 * 60 * 60 * 1000,
