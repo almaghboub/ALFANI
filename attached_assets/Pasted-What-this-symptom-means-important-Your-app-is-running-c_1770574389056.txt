@@ -1,0 +1,132 @@
+What this symptom means (important)
+
+Your app is running correctly, but production (Render) behavior ≠ development (Replit)
+
+That almost always means one of these:
+
+Database schema mismatch
+
+Missing environment variables
+
+Production-only middleware blocking requests
+
+CORS / cookie / HTTPS differences
+
+Permissions or foreign keys failing on writes
+
+Step 1 — Identify which features are broken (you must do this)
+
+Make a short list like this:
+
+Feature	Replit	Render
+Create order	✅	❌
+Add product	✅	❌
+Login	✅	✅
+View products	✅	✅
+
+This tells us:
+
+Reads work
+
+Writes partially fail
+
+That points directly to database or validation issues.
+
+Step 2 — What to ask Replit (copy/paste)
+🔴 Ask #1 (MOST IMPORTANT)
+
+“Can you help me compare my Replit database schema with my Render database schema and confirm that all tables, columns, and relations required for orders and products exist?”
+
+🔴 Ask #2
+
+“What migration or database setup command must be run on Render to enable create/update operations for orders and products?”
+
+🔴 Ask #3
+
+“Can you check if any required environment variables for creating orders/products are missing in Render but present in Replit?”
+
+🔴 Ask #4
+
+“Are there any production-only checks (NODE_ENV=production) that could block POST requests for orders or products?”
+
+🔴 Ask #5 (if frontend ≠ backend)
+
+“Can you verify that CORS and cookies are configured correctly for POST requests in production (Render HTTPS)?”
+
+Step 3 — What YOU should check immediately (no help needed)
+✅ Check Render logs when a feature fails
+
+Try the broken feature → open Render Logs
+
+Look for:
+
+relation does not exist
+
+column does not exist
+
+foreign key constraint
+
+permission denied
+
+validation failed
+
+Even one line of that log identifies the problem.
+
+✅ Check environment variables on Render
+
+Make sure these exist (names must match EXACTLY):
+
+DATABASE_URL
+
+SESSION_SECRET or JWT_SECRET
+
+NODE_ENV=production
+
+✅ Confirm migrations ran
+
+If you’re using:
+
+Prisma → prisma migrate deploy
+
+Django → manage.py migrate
+
+Sequelize → sequelize.sync() or migrations
+
+If this did NOT run → features that write data WILL fail.
+
+Step 4 — How to report the issue properly (this speeds fixes up)
+
+When asking for help, send:
+
+Feature name (e.g., “Create order”)
+
+Expected behavior
+
+Actual behavior on Render
+
+One Render log error line
+
+Example:
+
+“Create order works on Replit but fails on Render. Render log: relation "orders" does not exist.”
+
+That’s a 2-minute fix instead of days.
+
+Final important truth
+
+Deployment problems are never random.
+Partial functionality = environment mismatch.
+
+Once the database schema + env vars + production settings match Replit, all features will work.
+
+Next step (do this now):
+
+Reply with:
+
+Which features are broken
+
+One error line from Render logs
+
+Your stack (Node + Prisma / Django / etc.)
+
+I’ll give you the exact command or config change to fix it.

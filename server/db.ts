@@ -69,6 +69,9 @@ export async function initializeDatabase() {
         // Column may already exist
       }
       
+      // Always run migrations to fix schema mismatches
+      await migrateProductsTable();
+      
       await ensureAdminUser();
       return;
     }
