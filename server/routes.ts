@@ -56,20 +56,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const MemoryStoreSession = MemoryStore(session);
   const isProduction = process.env.NODE_ENV === 'production';
   
-  app.set('trust proxy', 1);
+  app.set('trust proxy', true);
   app.use(
     session({
       store: new MemoryStoreSession({
-        checkPeriod: 86400000, // prune expired entries every 24h
+        checkPeriod: 86400000,
       }),
       secret: process.env.SESSION_SECRET || "your-secret-key",
       resave: true,
-      saveUninitialized: false,
+      saveUninitialized: true,
       cookie: {
-        secure: isProduction,
+        secure: false,
         httpOnly: true,
         sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        maxAge: 24 * 60 * 60 * 1000,
         path: '/',
       },
     })
