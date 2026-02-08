@@ -73,7 +73,7 @@ export default function Invoice() {
   }, [safes, selectedSafeId]);
 
   const createInvoiceMutation = useMutation({
-    mutationFn: async (data: { customerName: string; branch: string; items: CartItem[]; safeId: string }) => {
+    mutationFn: async (data: { customerName: string; branch: string; items: CartItem[]; safeId: string | null }) => {
       const response = await apiRequest("POST", "/api/invoices", data);
       return response.json();
     },
@@ -510,11 +510,7 @@ export default function Invoice() {
       toast({ title: t("error"), description: t("cartEmpty"), variant: "destructive" });
       return;
     }
-    if (!selectedSafeId) {
-      toast({ title: t("error"), description: t("selectCashbox"), variant: "destructive" });
-      return;
-    }
-    createInvoiceMutation.mutate({ customerName, branch, items: cart, safeId: selectedSafeId });
+    createInvoiceMutation.mutate({ customerName, branch, items: cart, safeId: selectedSafeId || null });
   };
 
   const filteredProducts = products.filter(product => 

@@ -2248,10 +2248,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "At least one item is required" });
       }
       
-      if (!safeId) {
-        return res.status(400).json({ message: "Cashbox is required" });
-      }
-      
       for (const item of items) {
         if (!item.productId || !item.productName || typeof item.quantity !== 'number' || item.quantity <= 0) {
           return res.status(400).json({ message: "Invalid item data" });
@@ -2287,22 +2283,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerName: customerName.trim(),
         branch,
         totalAmount: String(totalAmount),
-        safeId,
+        safeId: safeId || null,
       };
       
       const invoice = await storage.createInvoice(invoiceData, itemsData);
       
-      const userId = (req.user as any)?.id || 'system';
-      await storage.createSafeTransaction({
-        safeId,
-        type: 'deposit',
-        amountUSD: "0",
-        amountLYD: String(totalAmount),
-        description: `Sale: ${invoiceNumber} - ${customerName.trim()}`,
-        referenceType: 'invoice',
-        referenceId: invoice.id,
-        createdByUserId: userId,
-      });
+      if (safeId) {
+        const userId = (req.user as any)?.id || 'system';
+        await storage.createSafeTransaction({
+          safeId,
+          type: 'deposit',
+          amountUSD: "0",
+          amountLYD: String(totalAmount),
+          description: `Sale: ${invoiceNumber} - ${customerName.trim()}`,
+          referenceType: 'invoice',
+          referenceId: invoice.id,
+          createdByUserId: userId,
+        });
+      }
       
       res.status(201).json(invoice);
     } catch (error) {
