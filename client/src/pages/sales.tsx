@@ -115,7 +115,7 @@ export default function Sales() {
               }
               .brand { display: flex; align-items: center; gap: 18px; }
               .logo-wrap {
-                width: 90px; height: 90px;
+                width: 140px; height: 140px;
                 border-radius: 16px;
                 overflow: hidden;
                 display: flex; align-items: center; justify-content: center;
