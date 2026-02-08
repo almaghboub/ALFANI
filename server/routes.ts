@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
-import MemoryStore from "memorystore";
+import pgSession from "connect-pg-simple";
 import { storage } from "./storage";
 import { hashPassword, verifyPassword } from "./auth";
 import { requireAuth, requireOwner, requireOperational, requireDeliveryManager, requireShippingStaff, requireDeliveryAccess } from "./middleware";
@@ -52,19 +52,20 @@ declare global {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Session configuration with MemoryStore
-  const MemoryStoreSession = MemoryStore(session);
-  const isProduction = process.env.NODE_ENV === 'production';
+  // Session configuration with PostgreSQL store (survives server restarts)
+  const PgStore = pgSession(session);
   
   app.set('trust proxy', true);
   app.use(
     session({
-      store: new MemoryStoreSession({
-        checkPeriod: 86400000,
+      store: new PgStore({
+        conString: process.env.DATABASE_URL,
+        tableName: 'session',
+        createTableIfMissing: true,
       }),
       secret: process.env.SESSION_SECRET || "your-secret-key",
-      resave: true,
-      saveUninitialized: true,
+      resave: false,
+      saveUninitialized: false,
       cookie: {
         secure: false,
         httpOnly: true,
@@ -159,8 +160,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error("Session save error:", saveErr);
             return next(saveErr);
           }
-          console.log("Login success - Session ID:", req.sessionID);
-          console.log("Login success - User:", user.username);
           res.json({ user });
         });
       });
@@ -177,10 +176,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/auth/me", (req, res) => {
-    console.log("Auth check - Session ID:", req.sessionID);
-    console.log("Auth check - Session user:", (req.session as any)?.passport?.user);
-    console.log("Auth check - isAuthenticated:", req.isAuthenticated());
-    console.log("Auth check - Cookies received:", req.headers.cookie);
     if (req.isAuthenticated()) {
       res.json({ user: req.user });
     } else {
