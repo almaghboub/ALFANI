@@ -141,7 +141,7 @@ export default function Inventory() {
                 <TableCell className="font-medium">{product.name}</TableCell>
                 <TableCell>{product.sku}</TableCell>
                 <TableCell>{product.category || "-"}</TableCell>
-                <TableCell>${parseFloat(product.price).toFixed(2)}</TableCell>
+                <TableCell>{parseFloat(product.price).toFixed(2)} LYD</TableCell>
                 <TableCell>{quantity}</TableCell>
                 <TableCell>
                   {isOutOfStock ? (

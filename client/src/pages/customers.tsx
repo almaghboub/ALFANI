@@ -484,11 +484,11 @@ export default function Customers() {
                                 {(totalAmount * lydExchangeRate).toFixed(2)} LYD
                               </div>
                               <div className="text-xs text-muted-foreground">
-                                ${totalAmount.toFixed(2)}
+                                {totalAmount.toFixed(2)} LYD
                               </div>
                             </div>
                           ) : (
-                            <span className="font-semibold">${totalAmount.toFixed(2)}</span>
+                            <span className="font-semibold">{totalAmount.toFixed(2)} LYD</span>
                           )}
                         </TableCell>
                         <TableCell data-testid={`text-down-payment-${customer.id}`}>
@@ -498,11 +498,11 @@ export default function Customers() {
                                 {(totalDownPayment * lydExchangeRate).toFixed(2)} LYD
                               </div>
                               <div className="text-xs text-muted-foreground">
-                                ${totalDownPayment.toFixed(2)}
+                                {totalDownPayment.toFixed(2)} LYD
                               </div>
                             </div>
                           ) : (
-                            <span className="font-semibold text-green-600">${totalDownPayment.toFixed(2)}</span>
+                            <span className="font-semibold text-green-600">{totalDownPayment.toFixed(2)} LYD</span>
                           )}
                         </TableCell>
                         <TableCell data-testid={`text-phone-${customer.id}`}>
@@ -850,10 +850,10 @@ export default function Customers() {
                               <p className="font-bold text-blue-600" data-testid="text-view-total-amount">
                                 {(totalAmount * lydExchangeRate).toFixed(2)} LYD
                               </p>
-                              <p className="text-xs text-muted-foreground">${totalAmount.toFixed(2)}</p>
+                              <p className="text-xs text-muted-foreground">{totalAmount.toFixed(2)} LYD</p>
                             </div>
                           ) : (
-                            <p className="mt-1 font-semibold" data-testid="text-view-total-amount">${totalAmount.toFixed(2)}</p>
+                            <p className="mt-1 font-semibold" data-testid="text-view-total-amount">{totalAmount.toFixed(2)} LYD</p>
                           )}
                         </div>
                         <div>
@@ -863,10 +863,10 @@ export default function Customers() {
                               <p className="font-bold text-green-600" data-testid="text-view-total-down-payment">
                                 {(totalDownPayment * lydExchangeRate).toFixed(2)} LYD
                               </p>
-                              <p className="text-xs text-muted-foreground">${totalDownPayment.toFixed(2)}</p>
+                              <p className="text-xs text-muted-foreground">{totalDownPayment.toFixed(2)} LYD</p>
                             </div>
                           ) : (
-                            <p className="mt-1 text-blue-600 font-semibold" data-testid="text-view-total-down-payment">${totalDownPayment.toFixed(2)}</p>
+                            <p className="mt-1 text-blue-600 font-semibold" data-testid="text-view-total-down-payment">{totalDownPayment.toFixed(2)} LYD</p>
                           )}
                         </div>
                         <div>
@@ -876,10 +876,10 @@ export default function Customers() {
                               <p className="font-bold text-orange-600" data-testid="text-view-total-remaining-balance">
                                 {(totalRemainingBalance * lydExchangeRate).toFixed(2)} LYD
                               </p>
-                              <p className="text-xs text-muted-foreground">${totalRemainingBalance.toFixed(2)}</p>
+                              <p className="text-xs text-muted-foreground">{totalRemainingBalance.toFixed(2)} LYD</p>
                             </div>
                           ) : (
-                            <p className="mt-1 text-red-600 font-semibold" data-testid="text-view-total-remaining-balance">${totalRemainingBalance.toFixed(2)}</p>
+                            <p className="mt-1 text-red-600 font-semibold" data-testid="text-view-total-remaining-balance">{totalRemainingBalance.toFixed(2)} LYD</p>
                           )}
                         </div>
                       </div>

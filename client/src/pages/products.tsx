@@ -208,8 +208,8 @@ export default function Products() {
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.sku}</TableCell>
                     <TableCell>{product.category || "-"}</TableCell>
-                    <TableCell>${parseFloat(product.price).toFixed(2)}</TableCell>
-                    <TableCell>${parseFloat(product.costPrice || "0").toFixed(2)}</TableCell>
+                    <TableCell>{parseFloat(product.price).toFixed(2)} LYD</TableCell>
+                    <TableCell>{parseFloat(product.costPrice || "0").toFixed(2)} LYD</TableCell>
                     <TableCell>
                       {(() => {
                         const totalQty = product.branchInventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;

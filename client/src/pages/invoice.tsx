@@ -218,7 +218,7 @@ export default function Invoice() {
                       <TableRow key={product.id}>
                         <TableCell>{product.name}</TableCell>
                         <TableCell>{product.sku}</TableCell>
-                        <TableCell>${Number(product.price).toFixed(2)}</TableCell>
+                        <TableCell>{Number(product.price).toFixed(2)} LYD</TableCell>
                         <TableCell>{getAvailableQuantity(product)}</TableCell>
                         <TableCell>
                           <Button

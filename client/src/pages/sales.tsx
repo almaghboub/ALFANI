@@ -233,8 +233,8 @@ export default function Sales() {
                       <td>${idx + 1}</td>
                       <td>${item.productName}</td>
                       <td>${item.quantity}</td>
-                      <td>$${Number(item.unitPrice).toFixed(2)}</td>
-                      <td>$${Number(item.lineTotal).toFixed(2)}</td>
+                      <td>${Number(item.unitPrice).toFixed(2)} LYD</td>
+                      <td>${Number(item.lineTotal).toFixed(2)} LYD</td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -244,11 +244,11 @@ export default function Sales() {
                 <div class="totals-box">
                   <div class="total-row">
                     <span>${t("subtotal")}:</span>
-                    <span>$${invoice.items.reduce((s, i) => s + Number(i.lineTotal), 0).toFixed(2)}</span>
+                    <span>${invoice.items.reduce((s, i) => s + Number(i.lineTotal), 0).toFixed(2)} LYD</span>
                   </div>
                   <div class="total-row grand">
                     <span>${t("total")}:</span>
-                    <span class="amount">$${Number(invoice.totalAmount).toFixed(2)}</span>
+                    <span class="amount">${Number(invoice.totalAmount).toFixed(2)} LYD</span>
                   </div>
                 </div>
               </div>
@@ -299,7 +299,7 @@ export default function Sales() {
               <CardTitle className="text-sm font-medium text-muted-foreground">{t("totalSales")}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalSales.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{totalSales.toFixed(2)} LYD</div>
             </CardContent>
           </Card>
           <Card>
@@ -363,7 +363,7 @@ export default function Sales() {
                           <Badge variant="outline">{invoice.branch}</Badge>
                         </TableCell>
                         <TableCell>{invoice.items.length}</TableCell>
-                        <TableCell className="font-semibold">${Number(invoice.totalAmount).toFixed(2)}</TableCell>
+                        <TableCell className="font-semibold">{Number(invoice.totalAmount).toFixed(2)} LYD</TableCell>
                         <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
@@ -426,8 +426,8 @@ export default function Sales() {
                       <TableRow key={item.id}>
                         <TableCell>{item.productName}</TableCell>
                         <TableCell>{item.quantity}</TableCell>
-                        <TableCell>${Number(item.unitPrice).toFixed(2)}</TableCell>
-                        <TableCell>${Number(item.lineTotal).toFixed(2)}</TableCell>
+                        <TableCell>{Number(item.unitPrice).toFixed(2)} LYD</TableCell>
+                        <TableCell>{Number(item.lineTotal).toFixed(2)} LYD</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -436,7 +436,7 @@ export default function Sales() {
 
               <div className="flex justify-between items-center pt-4 border-t">
                 <span className="text-lg font-semibold">{t("total")}</span>
-                <span className="text-2xl font-bold">${Number(selectedInvoice.totalAmount).toFixed(2)}</span>
+                <span className="text-2xl font-bold">{Number(selectedInvoice.totalAmount).toFixed(2)} LYD</span>
               </div>
 
               <Button onClick={() => handlePrint(selectedInvoice)} className="w-full" data-testid="button-print-dialog">

@@ -124,7 +124,7 @@ export default function Dashboard() {
     {
       id: "total-sales",
       label: t('totalSales') || "Total Sales",
-      value: metricsLoading ? null : `$${(invoiceMetrics?.totalSales || 0).toFixed(2)}`,
+      value: metricsLoading ? null : `${(invoiceMetrics?.totalSales || 0).toFixed(2)} LYD`,
       sub: t('allInvoices') || "All invoices",
       icon: DollarSign,
       color: "emerald",
@@ -216,7 +216,7 @@ export default function Dashboard() {
                     ) : (
                       <>
                         <p className="text-2xl font-bold text-foreground tracking-tight" data-testid="text-safe-balance">
-                          ${(financialSummary?.totalSafeBalanceUSD || 0).toFixed(2)}
+                          {(financialSummary?.totalSafeBalanceUSD || 0).toFixed(2)} LYD
                         </p>
                         <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">
                           {(financialSummary?.totalSafeBalanceLYD || 0).toFixed(2)} LYD
@@ -240,7 +240,7 @@ export default function Dashboard() {
                       <Skeleton className="h-8 w-24" />
                     ) : (
                       <p className="text-2xl font-bold text-cyan-700 dark:text-cyan-400 tracking-tight" data-testid="text-avg-order">
-                        ${(invoiceMetrics?.avgOrderValue || 0).toFixed(2)}
+                        {(invoiceMetrics?.avgOrderValue || 0).toFixed(2)} LYD
                       </p>
                     )}
                     <p className="text-[11px] text-muted-foreground/70">{t('perInvoice') || "Per invoice"}</p>
@@ -258,7 +258,7 @@ export default function Dashboard() {
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('totalExpenses') || "Total Expenses"}</p>
                     <p className="text-2xl font-bold text-red-700 dark:text-red-400 tracking-tight" data-testid="text-total-expenses">
-                      ${totalExpenses.toFixed(2)}
+                      {totalExpenses.toFixed(2)} LYD
                     </p>
                     <p className="text-[11px] text-muted-foreground/70">{expenses.length} {t('entries') || "entries"}</p>
                   </div>
@@ -285,7 +285,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('totalSales') || "Sales"}</p>
-                    <p className="text-lg font-bold text-blue-700 dark:text-blue-400 mt-0.5">${(invoiceMetrics.byBranch.ALFANI1?.sales || 0).toFixed(2)}</p>
+                    <p className="text-lg font-bold text-blue-700 dark:text-blue-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI1?.sales || 0).toFixed(2)} LYD</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('totalInvoices') || "Invoices"}</p>
@@ -311,7 +311,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('totalSales') || "Sales"}</p>
-                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">${(invoiceMetrics.byBranch.ALFANI2?.sales || 0).toFixed(2)}</p>
+                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI2?.sales || 0).toFixed(2)} LYD</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('totalInvoices') || "Invoices"}</p>
@@ -341,7 +341,7 @@ export default function Dashboard() {
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                     <Tooltip
-                      formatter={(value) => [`$${value}`, t('totalSales') || 'Sales']}
+                      formatter={(value) => [`${value} LYD`, t('totalSales') || 'Sales']}
                       contentStyle={{
                         backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
@@ -432,7 +432,7 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-bold">${Number(inv.totalAmount).toFixed(2)}</p>
+                          <p className="text-sm font-bold">{Number(inv.totalAmount).toFixed(2)} LYD</p>
                           <Badge variant="outline" className="text-[10px] font-medium">{inv.branch}</Badge>
                         </div>
                       </div>

@@ -488,8 +488,8 @@ export default function ReadyToBuy() {
                           <TableRow key={item.id}>
                             <TableCell>{item.productName}</TableCell>
                             <TableCell className="text-center">{item.quantity}</TableCell>
-                            <TableCell className="text-right">${parseFloat(item.unitPrice).toFixed(2)}</TableCell>
-                            <TableCell className="text-right">${parseFloat(item.totalPrice).toFixed(2)}</TableCell>
+                            <TableCell className="text-right">{parseFloat(item.unitPrice).toFixed(2)} LYD</TableCell>
+                            <TableCell className="text-right">{parseFloat(item.totalPrice).toFixed(2)} LYD</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
