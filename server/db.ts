@@ -15,18 +15,22 @@ if (!process.env.DATABASE_URL) {
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
+async function hashAdminPassword(): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const derivedKey = await new Promise<Buffer>((resolve, reject) => {
+    scrypt("admin", salt, 64, (err, key) => {
+      if (err) reject(err);
+      else resolve(key);
+    });
+  });
+  return `${salt}:${derivedKey.toString("hex")}`;
+}
+
 async function ensureAdminUser() {
   try {
     const adminCheck = await pool.query(`SELECT id FROM users WHERE username = 'admin'`);
+    const hashedPassword = await hashAdminPassword();
     if (adminCheck.rows.length === 0) {
-      const salt = randomBytes(16).toString("hex");
-      const derivedKey = await new Promise<Buffer>((resolve, reject) => {
-        scrypt("admin", salt, 64, (err, key) => {
-          if (err) reject(err);
-          else resolve(key);
-        });
-      });
-      const hashedPassword = `${salt}:${derivedKey.toString("hex")}`;
       await pool.query(
         `INSERT INTO users (username, password, role, first_name, last_name, email, is_active)
          VALUES ('admin', $1, 'owner', 'Admin', 'User', 'admin@lynxly.com', true)`,
@@ -34,20 +38,8 @@ async function ensureAdminUser() {
       );
       console.log("Default admin user created successfully.");
     } else {
-      const adminUser = await pool.query(`SELECT password FROM users WHERE username = 'admin'`);
-      const currentHash = adminUser.rows[0]?.password;
-      if (currentHash && !currentHash.includes(':')) {
-        const salt = randomBytes(16).toString("hex");
-        const derivedKey = await new Promise<Buffer>((resolve, reject) => {
-          scrypt("admin", salt, 64, (err, key) => {
-            if (err) reject(err);
-            else resolve(key);
-          });
-        });
-        const hashedPassword = `${salt}:${derivedKey.toString("hex")}`;
-        await pool.query(`UPDATE users SET password = $1 WHERE username = 'admin'`, [hashedPassword]);
-        console.log("Fixed admin user password hash format.");
-      }
+      await pool.query(`UPDATE users SET password = $1 WHERE username = 'admin'`, [hashedPassword]);
+      console.log("Admin user password verified and updated.");
     }
   } catch (error) {
     console.error("Error ensuring admin user:", error);
