@@ -686,7 +686,7 @@ export default function Invoice() {
                 <Button 
                   className="flex-1" 
                   onClick={handleSubmit}
-                  disabled={cart.length === 0 || !customerName.trim() || !selectedSafeId || createInvoiceMutation.isPending}
+                  disabled={cart.length === 0 || !customerName.trim() || createInvoiceMutation.isPending}
                   data-testid="button-create-invoice"
                 >
                   <Printer className="h-4 w-4 ltr:mr-2 rtl:ml-2" />
