@@ -55,7 +55,11 @@ export default function Products() {
       resetForm();
       toast({ title: t("success"), description: t("productCreated") });
     },
-    onError: () => {
+    onError: (error: any) => {
+      if (error?.message?.includes("401")) {
+        window.location.href = "/";
+        return;
+      }
       toast({ title: t("error"), description: t("failedCreateProduct"), variant: "destructive" });
     },
   });
