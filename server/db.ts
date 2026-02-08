@@ -368,22 +368,23 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS products (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         name TEXT NOT NULL,
-        sku TEXT NOT NULL UNIQUE,
+        sku TEXT,
         description TEXT,
-        cost_price DECIMAL(10,2) NOT NULL DEFAULT 0,
-        selling_price DECIMAL(10,2) NOT NULL DEFAULT 0,
+        price DECIMAL(10,2) DEFAULT 0,
+        cost_price DECIMAL(10,2),
         category TEXT,
         is_active BOOLEAN NOT NULL DEFAULT true,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
 
-      CREATE TABLE IF NOT EXISTS inventory (
+      CREATE TABLE IF NOT EXISTS branch_inventory (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-        product_id VARCHAR NOT NULL REFERENCES products(id),
+        product_id VARCHAR NOT NULL REFERENCES products(id) ON DELETE CASCADE,
         branch branch_type NOT NULL,
         quantity INTEGER NOT NULL DEFAULT 0,
-        min_quantity INTEGER NOT NULL DEFAULT 0,
+        low_stock_threshold INTEGER NOT NULL DEFAULT 5,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
 
@@ -410,9 +411,87 @@ export async function initializeDatabase() {
 
     console.log("Database tables created successfully.");
 
+    // Migrate existing products table if needed (fix column mismatches)
+    await migrateProductsTable();
+
     // Seed admin user after tables are created
     await ensureAdminUser();
   } catch (error) {
     console.error("Error initializing database:", error);
+  }
+}
+
+async function migrateProductsTable() {
+  try {
+    // Check if old 'selling_price' column exists and rename to 'price'
+    const sellingPriceCol = await pool.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'products' AND column_name = 'selling_price'
+    `);
+    if (sellingPriceCol.rows.length > 0) {
+      console.log("Migrating: renaming selling_price to price...");
+      await pool.query(`ALTER TABLE products RENAME COLUMN selling_price TO price`);
+    }
+
+    // Make sku nullable if it's currently NOT NULL
+    const skuCol = await pool.query(`
+      SELECT is_nullable FROM information_schema.columns
+      WHERE table_name = 'products' AND column_name = 'sku'
+    `);
+    if (skuCol.rows.length > 0 && skuCol.rows[0].is_nullable === 'NO') {
+      console.log("Migrating: making sku nullable...");
+      await pool.query(`ALTER TABLE products ALTER COLUMN sku DROP NOT NULL`);
+      // Drop unique constraint on sku if exists
+      await pool.query(`
+        DO $$ BEGIN
+          ALTER TABLE products DROP CONSTRAINT IF EXISTS products_sku_key;
+        EXCEPTION WHEN undefined_object THEN NULL;
+        END $$;
+      `);
+    }
+
+    // Make cost_price nullable
+    const costPriceCol = await pool.query(`
+      SELECT is_nullable FROM information_schema.columns
+      WHERE table_name = 'products' AND column_name = 'cost_price'
+    `);
+    if (costPriceCol.rows.length > 0 && costPriceCol.rows[0].is_nullable === 'NO') {
+      console.log("Migrating: making cost_price nullable...");
+      await pool.query(`ALTER TABLE products ALTER COLUMN cost_price DROP NOT NULL`);
+      await pool.query(`ALTER TABLE products ALTER COLUMN cost_price DROP DEFAULT`);
+    }
+
+    // Make price nullable with default 0
+    const priceCol = await pool.query(`
+      SELECT is_nullable FROM information_schema.columns
+      WHERE table_name = 'products' AND column_name = 'price'
+    `);
+    if (priceCol.rows.length > 0 && priceCol.rows[0].is_nullable === 'NO') {
+      console.log("Migrating: making price nullable...");
+      await pool.query(`ALTER TABLE products ALTER COLUMN price DROP NOT NULL`);
+    }
+
+    // Create branch_inventory table if old 'inventory' table exists but branch_inventory doesn't
+    const branchInvExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'branch_inventory'
+    `);
+    if (branchInvExists.rows.length === 0) {
+      console.log("Migrating: creating branch_inventory table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS branch_inventory (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          product_id VARCHAR NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+          branch branch_type NOT NULL,
+          quantity INTEGER NOT NULL DEFAULT 0,
+          low_stock_threshold INTEGER NOT NULL DEFAULT 5,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    console.log("Products table migration complete.");
+  } catch (error) {
+    console.error("Error migrating products table:", error);
   }
 }
