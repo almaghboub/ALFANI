@@ -26,13 +26,28 @@ async function ensureAdminUser() {
           else resolve(key);
         });
       });
-      const hashedPassword = `${derivedKey.toString("hex")}.${salt}`;
+      const hashedPassword = `${salt}:${derivedKey.toString("hex")}`;
       await pool.query(
         `INSERT INTO users (username, password, role, first_name, last_name, email, is_active)
          VALUES ('admin', $1, 'owner', 'Admin', 'User', 'admin@lynxly.com', true)`,
         [hashedPassword]
       );
       console.log("Default admin user created successfully.");
+    } else {
+      const adminUser = await pool.query(`SELECT password FROM users WHERE username = 'admin'`);
+      const currentHash = adminUser.rows[0]?.password;
+      if (currentHash && !currentHash.includes(':')) {
+        const salt = randomBytes(16).toString("hex");
+        const derivedKey = await new Promise<Buffer>((resolve, reject) => {
+          scrypt("admin", salt, 64, (err, key) => {
+            if (err) reject(err);
+            else resolve(key);
+          });
+        });
+        const hashedPassword = `${salt}:${derivedKey.toString("hex")}`;
+        await pool.query(`UPDATE users SET password = $1 WHERE username = 'admin'`, [hashedPassword]);
+        console.log("Fixed admin user password hash format.");
+      }
     }
   } catch (error) {
     console.error("Error ensuring admin user:", error);
