@@ -2,6 +2,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "@shared/schema";
 import { sql } from "drizzle-orm";
+import { scrypt, randomBytes } from "crypto";
 
 const { Pool } = pg;
 
@@ -14,6 +15,30 @@ if (!process.env.DATABASE_URL) {
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
+async function ensureAdminUser() {
+  try {
+    const adminCheck = await pool.query(`SELECT id FROM users WHERE username = 'admin'`);
+    if (adminCheck.rows.length === 0) {
+      const salt = randomBytes(16).toString("hex");
+      const derivedKey = await new Promise<Buffer>((resolve, reject) => {
+        scrypt("admin", salt, 64, (err, key) => {
+          if (err) reject(err);
+          else resolve(key);
+        });
+      });
+      const hashedPassword = `${derivedKey.toString("hex")}.${salt}`;
+      await pool.query(
+        `INSERT INTO users (username, password, role, first_name, last_name, email, is_active)
+         VALUES ('admin', $1, 'owner', 'Admin', 'User', 'admin@lynxly.com', true)`,
+        [hashedPassword]
+      );
+      console.log("Default admin user created successfully.");
+    }
+  } catch (error) {
+    console.error("Error ensuring admin user:", error);
+  }
+}
+
 export async function initializeDatabase() {
   try {
     const result = await pool.query(`
@@ -25,6 +50,8 @@ export async function initializeDatabase() {
     
     if (result.rows[0].exists) {
       console.log("Database tables already exist, skipping initialization.");
+      // Still ensure admin user exists even if tables already exist
+      await ensureAdminUser();
       return;
     }
 
@@ -363,6 +390,9 @@ export async function initializeDatabase() {
     `);
 
     console.log("Database tables created successfully.");
+
+    // Seed admin user after tables are created
+    await ensureAdminUser();
   } catch (error) {
     console.error("Error initializing database:", error);
   }
