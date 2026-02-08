@@ -128,6 +128,11 @@ export async function initializeDatabase() {
         CREATE TYPE branch_type AS ENUM ('alfani1', 'alfani2');
       EXCEPTION WHEN duplicate_object THEN null;
       END $$;
+      
+      DO $$ BEGIN
+        CREATE TYPE branch AS ENUM ('ALFANI1', 'ALFANI2');
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$;
     `);
 
     await pool.query(`
@@ -384,7 +389,7 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS branch_inventory (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         product_id VARCHAR NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-        branch branch_type NOT NULL,
+        branch branch NOT NULL,
         quantity INTEGER NOT NULL DEFAULT 0,
         low_stock_threshold INTEGER NOT NULL DEFAULT 5,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -395,7 +400,7 @@ export async function initializeDatabase() {
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         invoice_number TEXT NOT NULL UNIQUE,
         customer_name TEXT NOT NULL,
-        branch branch_type NOT NULL,
+        branch branch NOT NULL,
         total_amount DECIMAL(10,2) NOT NULL,
         safe_id VARCHAR REFERENCES safes(id),
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -426,55 +431,101 @@ export async function initializeDatabase() {
 
 async function migrateProductsTable() {
   try {
-    // Check if old 'selling_price' column exists and rename to 'price'
-    const sellingPriceCol = await pool.query(`
-      SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'products' AND column_name = 'selling_price'
+    // Ensure 'branch' enum exists (Drizzle uses "branch" not "branch_type")
+    await pool.query(`
+      DO $$ BEGIN
+        CREATE TYPE branch AS ENUM ('ALFANI1', 'ALFANI2');
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$;
     `);
-    if (sellingPriceCol.rows.length > 0) {
-      console.log("Migrating: renaming selling_price to price...");
-      await pool.query(`ALTER TABLE products RENAME COLUMN selling_price TO price`);
-    }
 
-    // Make sku nullable if it's currently NOT NULL
-    const skuCol = await pool.query(`
-      SELECT is_nullable FROM information_schema.columns
-      WHERE table_name = 'products' AND column_name = 'sku'
+    // Add uppercase values to branch enum if it only has lowercase
+    try {
+      const enumVals = await pool.query(`SELECT enumlabel FROM pg_enum WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'branch')`);
+      const labels = enumVals.rows.map((r: any) => r.enumlabel);
+      if (!labels.includes('ALFANI1')) {
+        await pool.query(`ALTER TYPE branch ADD VALUE IF NOT EXISTS 'ALFANI1'`);
+      }
+      if (!labels.includes('ALFANI2')) {
+        await pool.query(`ALTER TYPE branch ADD VALUE IF NOT EXISTS 'ALFANI2'`);
+      }
+    } catch (e) { /* enum might not exist yet */ }
+
+    // Check if products table exists
+    const productsExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'products'
     `);
-    if (skuCol.rows.length > 0 && skuCol.rows[0].is_nullable === 'NO') {
-      console.log("Migrating: making sku nullable...");
-      await pool.query(`ALTER TABLE products ALTER COLUMN sku DROP NOT NULL`);
-      // Drop unique constraint on sku if exists
-      await pool.query(`
-        DO $$ BEGIN
-          ALTER TABLE products DROP CONSTRAINT IF EXISTS products_sku_key;
-        EXCEPTION WHEN undefined_object THEN NULL;
-        END $$;
+    
+    if (productsExists.rows.length > 0) {
+      // Get current columns
+      const cols = await pool.query(`
+        SELECT column_name FROM information_schema.columns WHERE table_name = 'products'
       `);
+      const colNames = cols.rows.map((r: any) => r.column_name);
+
+      // Rename selling_price to price if needed
+      if (colNames.includes('selling_price') && !colNames.includes('price')) {
+        console.log("Migrating: renaming selling_price to price...");
+        await pool.query(`ALTER TABLE products RENAME COLUMN selling_price TO price`);
+      }
+
+      // Add price column if missing
+      if (!colNames.includes('price') && !colNames.includes('selling_price')) {
+        console.log("Migrating: adding price column...");
+        await pool.query(`ALTER TABLE products ADD COLUMN price DECIMAL(10,2) DEFAULT 0`);
+      }
+
+      // Add cost_price column if missing
+      if (!colNames.includes('cost_price')) {
+        console.log("Migrating: adding cost_price column...");
+        await pool.query(`ALTER TABLE products ADD COLUMN cost_price DECIMAL(10,2)`);
+      }
+
+      // Add updated_at column if missing
+      if (!colNames.includes('updated_at')) {
+        console.log("Migrating: adding updated_at column...");
+        await pool.query(`ALTER TABLE products ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT NOW()`);
+      }
+
+      // Make sku nullable
+      const skuCol = await pool.query(`
+        SELECT is_nullable FROM information_schema.columns
+        WHERE table_name = 'products' AND column_name = 'sku'
+      `);
+      if (skuCol.rows.length > 0 && skuCol.rows[0].is_nullable === 'NO') {
+        console.log("Migrating: making sku nullable...");
+        await pool.query(`ALTER TABLE products ALTER COLUMN sku DROP NOT NULL`);
+        await pool.query(`
+          DO $$ BEGIN
+            ALTER TABLE products DROP CONSTRAINT IF EXISTS products_sku_key;
+          EXCEPTION WHEN undefined_object THEN NULL;
+          END $$;
+        `);
+      }
+
+      // Make cost_price nullable if NOT NULL
+      const costPriceCol = await pool.query(`
+        SELECT is_nullable FROM information_schema.columns
+        WHERE table_name = 'products' AND column_name = 'cost_price'
+      `);
+      if (costPriceCol.rows.length > 0 && costPriceCol.rows[0].is_nullable === 'NO') {
+        console.log("Migrating: making cost_price nullable...");
+        await pool.query(`ALTER TABLE products ALTER COLUMN cost_price DROP NOT NULL`);
+        await pool.query(`ALTER TABLE products ALTER COLUMN cost_price DROP DEFAULT`);
+      }
+
+      // Make price nullable
+      const priceCol = await pool.query(`
+        SELECT is_nullable FROM information_schema.columns
+        WHERE table_name = 'products' AND column_name = 'price'
+      `);
+      if (priceCol.rows.length > 0 && priceCol.rows[0].is_nullable === 'NO') {
+        console.log("Migrating: making price nullable...");
+        await pool.query(`ALTER TABLE products ALTER COLUMN price DROP NOT NULL`);
+      }
     }
 
-    // Make cost_price nullable
-    const costPriceCol = await pool.query(`
-      SELECT is_nullable FROM information_schema.columns
-      WHERE table_name = 'products' AND column_name = 'cost_price'
-    `);
-    if (costPriceCol.rows.length > 0 && costPriceCol.rows[0].is_nullable === 'NO') {
-      console.log("Migrating: making cost_price nullable...");
-      await pool.query(`ALTER TABLE products ALTER COLUMN cost_price DROP NOT NULL`);
-      await pool.query(`ALTER TABLE products ALTER COLUMN cost_price DROP DEFAULT`);
-    }
-
-    // Make price nullable with default 0
-    const priceCol = await pool.query(`
-      SELECT is_nullable FROM information_schema.columns
-      WHERE table_name = 'products' AND column_name = 'price'
-    `);
-    if (priceCol.rows.length > 0 && priceCol.rows[0].is_nullable === 'NO') {
-      console.log("Migrating: making price nullable...");
-      await pool.query(`ALTER TABLE products ALTER COLUMN price DROP NOT NULL`);
-    }
-
-    // Create branch_inventory table if old 'inventory' table exists but branch_inventory doesn't
+    // Create branch_inventory table if it doesn't exist
     const branchInvExists = await pool.query(`
       SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'branch_inventory'
     `);
@@ -484,11 +535,49 @@ async function migrateProductsTable() {
         CREATE TABLE IF NOT EXISTS branch_inventory (
           id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
           product_id VARCHAR NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-          branch branch_type NOT NULL,
+          branch branch NOT NULL,
           quantity INTEGER NOT NULL DEFAULT 0,
           low_stock_threshold INTEGER NOT NULL DEFAULT 5,
           created_at TIMESTAMP NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // Create sales_invoices table if missing
+    const invoicesExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sales_invoices'
+    `);
+    if (invoicesExists.rows.length === 0) {
+      console.log("Migrating: creating sales_invoices table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS sales_invoices (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          invoice_number TEXT NOT NULL UNIQUE,
+          customer_name TEXT NOT NULL,
+          branch branch NOT NULL,
+          total_amount DECIMAL(10,2) NOT NULL,
+          safe_id VARCHAR REFERENCES safes(id),
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // Create invoice_items table if missing
+    const invoiceItemsExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'invoice_items'
+    `);
+    if (invoiceItemsExists.rows.length === 0) {
+      console.log("Migrating: creating invoice_items table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS invoice_items (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          invoice_id VARCHAR NOT NULL REFERENCES sales_invoices(id) ON DELETE CASCADE,
+          product_id VARCHAR NOT NULL REFERENCES products(id),
+          product_name TEXT NOT NULL,
+          quantity INTEGER NOT NULL,
+          unit_price DECIMAL(10,2) NOT NULL,
+          line_total DECIMAL(10,2) NOT NULL
         )
       `);
     }

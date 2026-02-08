@@ -1,0 +1,88 @@
+  hint: 'Perhaps you meant to reference the column "shipping_rates.created_at".',
+  position: '79',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3829',
+  routine: 'errorMissingColumn'
+}
+Migrating: making sku nullable...
+Migrating: making price nullable...
+Migrating: creating branch_inventory table...
+Error migrating products table: error: type "branch_type" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async migrateProductsTable (file:///opt/render/project/src/dist/index.js:1128:7)
+    at async initializeDatabase (file:///opt/render/project/src/dist/index.js:738:7)
+    at async file:///opt/render/project/src/dist/index.js:4409:3 {
+  length: 99,
+  severity: 'ERROR',
+  code: '42704',
+  detail: undefined,
+  hint: undefined,
+  position: '214',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_type.c',
+  line: '270',
+  routine: 'typenameType'
+}
+Admin user password verified and updated.
+6:16:14 PM [express] serving on port 10000
+==> Your service is live 🎉
+==> 
+==> ///////////////////////////////////////////////////////////
+==> 
+==> Available at your primary URL https://alfani.onrender.com
+==> 
+==> ///////////////////////////////////////////////////////////
+6:16:26 PM [express] GET /api/auth/me 401 in 67ms :: {"message":"Not authenticated"}
+6:16:29 PM [express] POST /api/auth/login 200 in 658ms :: {"user":{"id":"5a1e3bc4-2c88-40e2-b6f4-75e…
+6:16:30 PM [express] GET /api/messages/unread-count 500 in 178ms :: {"message":"Failed to fetch unre…
+6:16:30 PM [express] GET /api/auth/me 200 in 476ms :: {"user":{"id":"5a1e3bc4-2c88-40e2-b6f4-75e1373…
+6:16:30 PM [express] GET /api/invoices/metrics 500 in 843ms :: {"message":"Failed to fetch invoice m…
+6:16:30 PM [express] GET /api/invoices 500 in 847ms :: {"message":"Failed to fetch invoices"}
+6:16:30 PM [express] GET /api/financial-summary 500 in 939ms :: {"message":"Failed to fetch financia…
+6:16:31 PM [express] GET /api/expenses 500 in 1046ms :: {"message":"Failed to fetch expenses"}
+6:16:31 PM [express] GET /api/products/with-inventory 500 in 1434ms :: {"message":"Failed to fetch p…
+6:16:35 PM [express] GET /api/products/with-inventory 500 in 422ms :: {"message":"Failed to fetch pr…
+Failed to create product: error: column "cost_price" of relation "products" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async PostgreSQLStorage.createProduct (file:///opt/render/project/src/dist/index.js:1902:20)
+    at async file:///opt/render/project/src/dist/index.js:3453:23
+6:17:07 PM [express] POST /api/products 500 in 834ms :: {"message":"Failed to create product: column…
+Failed to create product: error: column "cost_price" of relation "products" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async PostgreSQLStorage.createProduct (file:///opt/render/project/src/dist/index.js:1902:20)
+    at async file:///opt/render/project/src/dist/index.js:3453:23
+6:17:10 PM [express] POST /api/products 500 in 384ms :: {"message":"Failed to create product: column…
+Failed to create product: error: column "cost_price" of relation "products" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async PostgreSQLStorage.createProduct (file:///opt/render/project/src/dist/index.js:1902:20)
+    at async file:///opt/render/project/src/dist/index.js:3453:23
+6:17:12 PM [express] POST /api/products 500 in 465ms :: {"message":"Failed to create product: column…
+Failed to create product: error: column "cost_price" of relation "products" does not exist
+    at /opt/render/project/src/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async file:///opt/render/project/src/node_modules/drizzle-orm/node-postgres/session.js:83:22
+    at async PostgreSQLStorage.createProduct (file:///opt/render/project/src/dist/index.js:1902:20)
+    at async file:///opt/render/project/src/dist/index.js:3453:23
+6:17:14 PM [express] POST /api/products 500 in 352ms :: {"message":"Failed to create product: column…
