@@ -1496,14 +1496,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (!productData.sku || productData.sku.trim() === '') {
-        delete productData.sku;
+        productData.sku = null;
+      }
+      if (!productData.category || productData.category.trim() === '') {
+        productData.category = null;
+      }
+      if (!productData.description || productData.description.trim() === '') {
+        productData.description = null;
       }
       if (!productData.price || productData.price === '' || productData.price === '0') {
         productData.price = "0";
       }
+      if (!productData.costPrice || productData.costPrice === '' || productData.costPrice === '0') {
+        productData.costPrice = null;
+      }
       
       const result = insertProductSchema.safeParse(productData);
       if (!result.success) {
+        console.error("Product validation errors:", JSON.stringify(result.error.errors));
         return res.status(400).json({ message: "Invalid product data", errors: result.error.errors });
       }
       
@@ -1526,7 +1536,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       res.status(201).json(product);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Failed to create product:", error?.message || error);
       res.status(500).json({ message: "Failed to create product" });
     }
   });
