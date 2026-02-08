@@ -87,6 +87,8 @@ export default function Sales() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
       setIsDeleteDialogOpen(false);
       setInvoiceToDelete(null);
       toast({ title: t("invoiceDeleted") });
@@ -104,6 +106,8 @@ export default function Sales() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
       setIsReturnDialogOpen(false);
       setReturnInvoice(null);
       setReturnQuantities({});

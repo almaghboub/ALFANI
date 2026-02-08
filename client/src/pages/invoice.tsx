@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Product, ProductWithInventory } from "@shared/schema";
+import type { Product, ProductWithInventory, Safe } from "@shared/schema";
 import logoPath from "@assets/alfani-logo.png";
 
 function getLogoBase64(src: string): Promise<string> {
@@ -49,6 +49,7 @@ export default function Invoice() {
   const printRef = useRef<HTMLDivElement>(null);
   const [customerName, setCustomerName] = useState("");
   const [branch, setBranch] = useState<"ALFANI1" | "ALFANI2">("ALFANI1");
+  const [selectedSafeId, setSelectedSafeId] = useState<string>("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [logoBase64, setLogoBase64] = useState<string>(logoPath);
@@ -61,14 +62,26 @@ export default function Invoice() {
     queryKey: ["/api/products/with-inventory"],
   });
 
+  const { data: safes = [] } = useQuery<Safe[]>({
+    queryKey: ["/api/safes"],
+  });
+
+  useEffect(() => {
+    if (safes.length > 0 && !selectedSafeId) {
+      setSelectedSafeId(safes[0].id);
+    }
+  }, [safes, selectedSafeId]);
+
   const createInvoiceMutation = useMutation({
-    mutationFn: async (data: { customerName: string; branch: string; items: CartItem[] }) => {
+    mutationFn: async (data: { customerName: string; branch: string; items: CartItem[]; safeId: string }) => {
       const response = await apiRequest("POST", "/api/invoices", data);
       return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
       toast({ title: t("success"), description: t("invoiceCreated") });
       handlePrint();
       setCart([]);
@@ -497,7 +510,11 @@ export default function Invoice() {
       toast({ title: t("error"), description: t("cartEmpty"), variant: "destructive" });
       return;
     }
-    createInvoiceMutation.mutate({ customerName, branch, items: cart });
+    if (!selectedSafeId) {
+      toast({ title: t("error"), description: t("selectCashbox"), variant: "destructive" });
+      return;
+    }
+    createInvoiceMutation.mutate({ customerName, branch, items: cart, safeId: selectedSafeId });
   };
 
   const filteredProducts = products.filter(product => 
@@ -601,6 +618,21 @@ export default function Invoice() {
                   data-testid="input-customer-name"
                 />
               </div>
+              <div>
+                <Label>{t("cashbox")}</Label>
+                <Select value={selectedSafeId} onValueChange={setSelectedSafeId}>
+                  <SelectTrigger data-testid="select-cashbox">
+                    <SelectValue placeholder={t("selectCashbox")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {safes.filter(s => s.isActive).map(safe => (
+                      <SelectItem key={safe.id} value={safe.id}>
+                        {safe.name} ({Number(safe.balanceLYD).toFixed(2)} LYD)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               
               {cart.length > 0 ? (
                 <div className="border rounded-md">
@@ -656,7 +688,7 @@ export default function Invoice() {
                 <Button 
                   className="flex-1" 
                   onClick={handleSubmit}
-                  disabled={cart.length === 0 || !customerName.trim() || createInvoiceMutation.isPending}
+                  disabled={cart.length === 0 || !customerName.trim() || !selectedSafeId || createInvoiceMutation.isPending}
                   data-testid="button-create-invoice"
                 >
                   <Printer className="h-4 w-4 ltr:mr-2 rtl:ml-2" />

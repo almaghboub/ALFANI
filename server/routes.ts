@@ -1626,7 +1626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Safes
-  app.get("/api/safes", requireOwner, async (req, res) => {
+  app.get("/api/safes", requireAuth, async (req, res) => {
     try {
       const safes = await storage.getAllSafes();
       res.json(safes);
@@ -2210,7 +2210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/invoices", requireAuth, async (req, res) => {
     try {
-      const { customerName, branch, items } = req.body;
+      const { customerName, branch, items, safeId } = req.body;
       
       if (!customerName || typeof customerName !== 'string' || customerName.trim() === '') {
         return res.status(400).json({ message: "Customer name is required" });
@@ -2222,6 +2222,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
+      }
+      
+      if (!safeId) {
+        return res.status(400).json({ message: "Cashbox is required" });
       }
       
       for (const item of items) {
@@ -2259,9 +2263,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerName: customerName.trim(),
         branch,
         totalAmount: String(totalAmount),
+        safeId,
       };
       
       const invoice = await storage.createInvoice(invoiceData, itemsData);
+      
+      const userId = (req.user as any)?.id || 'system';
+      await storage.createSafeTransaction({
+        safeId,
+        type: 'deposit',
+        amountUSD: "0",
+        amountLYD: String(totalAmount),
+        description: `Sale: ${invoiceNumber} - ${customerName.trim()}`,
+        referenceType: 'invoice',
+        referenceId: invoice.id,
+        createdByUserId: userId,
+      });
+      
       res.status(201).json(invoice);
     } catch (error) {
       console.error("Failed to create invoice:", error);
@@ -2326,10 +2344,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/invoices/:id", requireAuth, async (req, res) => {
     try {
+      const existingInvoice = await storage.getInvoice(req.params.id);
+      if (!existingInvoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
       const success = await storage.deleteInvoice(req.params.id);
       if (!success) {
         return res.status(404).json({ message: "Invoice not found" });
       }
+      
+      if (existingInvoice.safeId) {
+        const userId = (req.user as any)?.id || 'system';
+        await storage.createSafeTransaction({
+          safeId: existingInvoice.safeId,
+          type: 'withdrawal',
+          amountUSD: "0",
+          amountLYD: String(existingInvoice.totalAmount),
+          description: `Invoice deleted: ${existingInvoice.invoiceNumber} - ${existingInvoice.customerName}`,
+          referenceType: 'invoice_delete',
+          referenceId: req.params.id,
+          createdByUserId: userId,
+        });
+      }
+      
       res.json({ message: "Invoice deleted successfully" });
     } catch (error) {
       console.error("Failed to delete invoice:", error);
@@ -2367,7 +2405,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      let returnAmount = 0;
+      for (const ret of returnItems) {
+        const invoiceItem = existingInvoice.items.find(i => i.id === ret.itemId);
+        if (invoiceItem) {
+          returnAmount += ret.quantity * Number(invoiceItem.unitPrice);
+        }
+      }
+
       const result = await storage.returnInvoiceItems(id, returnItems);
+      
+      if (existingInvoice.safeId && returnAmount > 0) {
+        const userId = (req.user as any)?.id || 'system';
+        await storage.createSafeTransaction({
+          safeId: existingInvoice.safeId,
+          type: 'withdrawal',
+          amountUSD: "0",
+          amountLYD: String(returnAmount.toFixed(2)),
+          description: `Return: ${existingInvoice.invoiceNumber} - ${existingInvoice.customerName}`,
+          referenceType: 'invoice_return',
+          referenceId: id,
+          createdByUserId: userId,
+        });
+      }
+      
       if (result === undefined) {
         const existing = await storage.getInvoice(id);
         if (!existing) {
