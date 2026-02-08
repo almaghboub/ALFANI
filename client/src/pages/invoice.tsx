@@ -281,8 +281,8 @@ export default function Invoice() {
                               </Button>
                             </div>
                           </TableCell>
-                          <TableCell>${item.unitPrice.toFixed(2)}</TableCell>
-                          <TableCell>${item.lineTotal.toFixed(2)}</TableCell>
+                          <TableCell>{item.unitPrice.toFixed(2)} LYD</TableCell>
+                          <TableCell>{item.lineTotal.toFixed(2)} LYD</TableCell>
                           <TableCell>
                             <Button size="icon" variant="ghost" onClick={() => removeFromCart(item.productId)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
@@ -301,7 +301,7 @@ export default function Invoice() {
               
               <div className="flex justify-between items-center pt-4 border-t">
                 <span className="text-lg font-semibold">{t("total")}</span>
-                <span className="text-2xl font-bold">${getTotal().toFixed(2)}</span>
+                <span className="text-2xl font-bold">{getTotal().toFixed(2)} LYD</span>
               </div>
               
               <div className="flex gap-2">
@@ -345,14 +345,14 @@ export default function Invoice() {
                 <tr key={item.productId}>
                   <td>{item.productName}</td>
                   <td>{item.quantity}</td>
-                  <td>${item.unitPrice.toFixed(2)}</td>
-                  <td>${item.lineTotal.toFixed(2)}</td>
+                  <td>{item.unitPrice.toFixed(2)} LYD</td>
+                  <td>{item.lineTotal.toFixed(2)} LYD</td>
                 </tr>
               ))}
             </tbody>
           </table>
           <div className="total">
-            {t("total")}: ${getTotal().toFixed(2)}
+            {t("total")}: {getTotal().toFixed(2)} LYD
           </div>
         </div>
       </div>
