@@ -248,6 +248,7 @@ export const salesInvoices = pgTable("sales_invoices", {
   customerName: text("customer_name").notNull(),
   branch: branchEnum("branch").notNull(),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  safeId: varchar("safe_id").references(() => safes.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

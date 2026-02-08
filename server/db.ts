@@ -62,7 +62,13 @@ export async function initializeDatabase() {
     
     if (result.rows[0].exists) {
       console.log("Database tables already exist, skipping initialization.");
-      // Still ensure admin user exists even if tables already exist
+      
+      try {
+        await pool.query(`ALTER TABLE sales_invoices ADD COLUMN IF NOT EXISTS safe_id VARCHAR REFERENCES safes(id)`);
+      } catch (e) {
+        // Column may already exist
+      }
+      
       await ensureAdminUser();
       return;
     }
@@ -387,6 +393,7 @@ export async function initializeDatabase() {
         customer_name TEXT NOT NULL,
         branch branch_type NOT NULL,
         total_amount DECIMAL(10,2) NOT NULL,
+        safe_id VARCHAR REFERENCES safes(id),
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
 
