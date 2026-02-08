@@ -614,6 +614,7 @@ export default function Invoice() {
                   data-testid="input-customer-name"
                 />
               </div>
+              {safes.filter(s => s.isActive).length > 0 && (
               <div>
                 <Label>{t("cashbox")}</Label>
                 <Select value={selectedSafeId} onValueChange={setSelectedSafeId}>
@@ -629,6 +630,7 @@ export default function Invoice() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
               
               {cart.length > 0 ? (
                 <div className="border rounded-md">
