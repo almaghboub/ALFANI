@@ -16,7 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Product, InsertProduct } from "@shared/schema";
 
 interface ProductWithInventory extends Product {
-  branchInventory?: Array<{ branch: string; quantity: number; lowStockThreshold: number }>;
+  inventory?: Array<{ branch: string; quantity: number; lowStockThreshold: number }>;
 }
 
 export default function Products() {
@@ -50,7 +50,7 @@ export default function Products() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/products-with-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
       setIsCreateDialogOpen(false);
       resetForm();
       toast({ title: t("success"), description: t("productCreated") });
@@ -110,8 +110,8 @@ export default function Products() {
 
   const handleEdit = (product: ProductWithInventory) => {
     setSelectedProduct(product);
-    const firstBranch = product.branchInventory?.[0];
-    const totalQty = product.branchInventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
+    const firstBranch = product.inventory?.[0];
+    const totalQty = product.inventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
     setFormData({
       name: product.name,
       sku: product.sku,
@@ -212,7 +212,7 @@ export default function Products() {
                     <TableCell>{parseFloat(product.costPrice || "0").toFixed(2)} LYD</TableCell>
                     <TableCell>
                       {(() => {
-                        const totalQty = product.branchInventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
+                        const totalQty = product.inventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
                         return (
                           <span className={`font-semibold ${totalQty === 0 ? 'text-red-500' : totalQty <= 5 ? 'text-amber-500' : 'text-foreground'}`}>
                             {totalQty}
