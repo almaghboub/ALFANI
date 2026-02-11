@@ -1047,6 +1047,17 @@ const resources = {
       reconciliationCreated: "Reconciliation recorded successfully",
       reconcile: "Reconcile",
 
+      // Transaction History
+      transactionHistory: "Transaction History",
+      allSafeTransactionsDesc: "All financial transactions across safes, including sales revenue, returns, and manual adjustments",
+      searchTransactions: "Search transactions...",
+      noTransactions: "No transactions recorded yet",
+      reference: "Reference",
+      amountUSD: "Amount (USD)",
+      amountLYD: "Amount (LYD)",
+      sale: "Sale",
+      return: "Return",
+
       // Owner Accounts & Capital
       capital: "Capital",
       ownerAccountsCapital: "Owner Accounts & Capital",
@@ -2203,6 +2214,17 @@ const resources = {
       noReconciliations: "لا توجد مطابقات مسجلة بعد",
       reconciliationCreated: "تم تسجيل المطابقة بنجاح",
       reconcile: "مطابقة",
+
+      // Transaction History
+      transactionHistory: "سجل المعاملات",
+      allSafeTransactionsDesc: "جميع المعاملات المالية عبر الصناديق، بما في ذلك إيرادات المبيعات والمرتجعات والتعديلات اليدوية",
+      searchTransactions: "البحث في المعاملات...",
+      noTransactions: "لا توجد معاملات مسجلة بعد",
+      reference: "المرجع",
+      amountUSD: "المبلغ (دولار)",
+      amountLYD: "المبلغ (دينار)",
+      sale: "بيع",
+      return: "مرتجع",
 
       // Owner Accounts & Capital
       capital: "رأس المال",

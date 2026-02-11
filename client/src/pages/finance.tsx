@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Wallet, Building2, Landmark, Warehouse, Users, Receipt, BookOpen, 
   Plus, ArrowUpRight, ArrowDownLeft, RefreshCw, TrendingUp, TrendingDown,
-  DollarSign, Banknote, Scale, UserCircle
+  DollarSign, Banknote, Scale, UserCircle, History, Search, ShoppingCart, RotateCcw
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -58,6 +58,20 @@ interface Bank {
   isActive: boolean;
 }
 
+interface SafeTransaction {
+  id: string;
+  safeId: string;
+  type: string;
+  amountUSD: string;
+  amountLYD: string;
+  exchangeRate: string | null;
+  description: string | null;
+  referenceType: string | null;
+  referenceId: string | null;
+  createdByUserId: string;
+  createdAt: string;
+}
+
 interface InvoiceMetrics {
   totalSales: number;
   totalItems: number;
@@ -87,6 +101,7 @@ export default function Finance() {
   const [ownerAccountDialogOpen, setOwnerAccountDialogOpen] = useState(false);
   const [capitalTxDialogOpen, setCapitalTxDialogOpen] = useState(false);
   const [selectedOwnerAccount, setSelectedOwnerAccount] = useState<string>("");
+  const [transactionSearchQuery, setTransactionSearchQuery] = useState("");
 
   const { data: summary, isLoading: summaryLoading } = useQuery<FinancialSummary>({
     queryKey: ["/api/financial-summary"],
@@ -114,6 +129,10 @@ export default function Finance() {
 
   const { data: ownerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/owner-accounts"],
+  });
+
+  const { data: allTransactions = [] } = useQuery<SafeTransaction[]>({
+    queryKey: ["/api/safe-transactions"],
   });
 
   const createReconciliationMutation = useMutation({
@@ -304,6 +323,10 @@ export default function Finance() {
           </TabsTrigger>
           <TabsTrigger value="capital" data-testid="tab-capital">
             {t("capital") || "Capital"}
+          </TabsTrigger>
+          <TabsTrigger value="transactions" data-testid="tab-transactions">
+            <History className="h-4 w-4 mr-1" />
+            {t("transactionHistory") || "Transaction History"}
           </TabsTrigger>
         </TabsList>
 
@@ -1245,6 +1268,120 @@ export default function Finance() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="transactions" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-5 w-5" />
+                {t("transactionHistory") || "Transaction History"}
+              </CardTitle>
+              <CardDescription>
+                {t("allSafeTransactionsDesc") || "All financial transactions across safes, including sales revenue, returns, and manual adjustments"}
+              </CardDescription>
+              <div className="relative mt-2">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder={t("searchTransactions") || "Search transactions..."}
+                  value={transactionSearchQuery}
+                  onChange={(e) => setTransactionSearchQuery(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search-transactions"
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {allTransactions.length === 0 ? (
+                <div className="text-center py-8">
+                  <Receipt className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">{t("noTransactions") || "No transactions recorded yet"}</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t("date") || "Date"}</TableHead>
+                        <TableHead>{t("type") || "Type"}</TableHead>
+                        <TableHead>{t("description") || "Description"}</TableHead>
+                        <TableHead>{t("reference") || "Reference"}</TableHead>
+                        <TableHead className="text-right">{t("amountUSD") || "Amount (USD)"}</TableHead>
+                        <TableHead className="text-right">{t("amountLYD") || "Amount (LYD)"}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allTransactions
+                        .filter((tx) => {
+                          if (!transactionSearchQuery) return true;
+                          const q = transactionSearchQuery.toLowerCase();
+                          return (
+                            (tx.description || "").toLowerCase().includes(q) ||
+                            (tx.type || "").toLowerCase().includes(q) ||
+                            (tx.referenceType || "").toLowerCase().includes(q) ||
+                            (tx.referenceId || "").toLowerCase().includes(q)
+                          );
+                        })
+                        .map((tx) => {
+                          const isDeposit = tx.type === "deposit";
+                          const isReturn = (tx.description || "").toLowerCase().includes("return") ||
+                                           (tx.referenceType || "").toLowerCase().includes("return");
+                          const isSale = (tx.referenceType || "").toLowerCase().includes("invoice") && isDeposit;
+                          
+                          return (
+                            <TableRow key={tx.id} data-testid={`row-transaction-${tx.id}`}>
+                              <TableCell className="whitespace-nowrap">
+                                {tx.createdAt ? format(new Date(tx.createdAt), "yyyy-MM-dd HH:mm") : "-"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={isDeposit ? "default" : "destructive"}
+                                  className={`flex items-center gap-1 w-fit ${isReturn ? "bg-orange-500" : ""}`}
+                                  data-testid={`badge-tx-type-${tx.id}`}
+                                >
+                                  {isReturn ? (
+                                    <RotateCcw className="h-3 w-3" />
+                                  ) : isSale ? (
+                                    <ShoppingCart className="h-3 w-3" />
+                                  ) : isDeposit ? (
+                                    <ArrowDownLeft className="h-3 w-3" />
+                                  ) : (
+                                    <ArrowUpRight className="h-3 w-3" />
+                                  )}
+                                  {isReturn
+                                    ? (t("return") || "Return")
+                                    : isSale
+                                    ? (t("sale") || "Sale")
+                                    : isDeposit
+                                    ? (t("deposit") || "Deposit")
+                                    : (t("withdrawal") || "Withdrawal")}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="max-w-[200px] truncate">
+                                {tx.description || "-"}
+                              </TableCell>
+                              <TableCell>
+                                {tx.referenceType && tx.referenceId ? (
+                                  <Badge variant="outline" className="font-mono text-xs" data-testid={`badge-tx-ref-${tx.id}`}>
+                                    {tx.referenceType}: {tx.referenceId}
+                                  </Badge>
+                                ) : "-"}
+                              </TableCell>
+                              <TableCell className={`text-right font-mono font-semibold ${isDeposit ? "text-green-600" : "text-red-600"}`}>
+                                {isDeposit ? "+" : "-"}${parseFloat(tx.amountUSD || "0").toFixed(2)}
+                              </TableCell>
+                              <TableCell className={`text-right font-mono font-semibold text-blue-600`}>
+                                {parseFloat(tx.amountLYD || "0").toFixed(2)} LYD
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

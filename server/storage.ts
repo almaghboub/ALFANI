@@ -212,6 +212,7 @@ export interface IStorage {
   updateSafe(id: string, safe: Partial<InsertSafe>): Promise<Safe | undefined>;
   deleteSafe(id: string): Promise<boolean>;
   getSafeTransactions(safeId: string): Promise<SafeTransaction[]>;
+  getAllSafeTransactions(): Promise<SafeTransaction[]>;
   createSafeTransaction(transaction: InsertSafeTransaction): Promise<SafeTransaction>;
 
   // Banks
@@ -1587,6 +1588,12 @@ export class PostgreSQLStorage implements IStorage {
     return await db.select()
       .from(safeTransactions)
       .where(eq(safeTransactions.safeId, safeId))
+      .orderBy(desc(safeTransactions.createdAt));
+  }
+
+  async getAllSafeTransactions(): Promise<SafeTransaction[]> {
+    return await db.select()
+      .from(safeTransactions)
       .orderBy(desc(safeTransactions.createdAt));
   }
 

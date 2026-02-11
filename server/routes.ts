@@ -1695,6 +1695,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // All Safe Transactions (for transaction history)
+  app.get("/api/safe-transactions", requireOwner, async (req, res) => {
+    try {
+      const transactions = await storage.getAllSafeTransactions();
+      res.json(transactions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch transactions" });
+    }
+  });
+
   // Safe Transactions
   app.get("/api/safes/:safeId/transactions", requireOwner, async (req, res) => {
     try {
