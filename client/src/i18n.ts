@@ -1098,6 +1098,8 @@ const resources = {
       enterDescription: "Enter description",
       costPrice: "Cost Price",
       noProductsFound: "No products found",
+      existingProducts: "Existing products - click to edit",
+      inStock: "in stock",
       deleting: "Deleting...",
       
       // Inventory
@@ -2253,6 +2255,8 @@ const resources = {
       enterDescription: "أدخل الوصف",
       costPrice: "سعر التكلفة",
       noProductsFound: "لا توجد منتجات",
+      existingProducts: "منتجات موجودة - انقر للتعديل",
+      inStock: "في المخزون",
       deleting: "جارٍ الحذف...",
       
       // Inventory

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Search, Pencil, Trash2, Package } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -27,6 +27,9 @@ export default function Products() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductWithInventory | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState<Partial<InsertProduct> & { branch?: string; initialQuantity?: number }>({
     name: "",
     sku: "",
@@ -42,6 +45,48 @@ export default function Products() {
   const { data: products = [], isLoading } = useQuery<ProductWithInventory[]>({
     queryKey: ["/api/products/with-inventory"],
   });
+
+  const nameSuggestions = useMemo(() => {
+    const name = formData.name?.trim() || "";
+    if (name.length < 1 || isEditDialogOpen) return [];
+    return products.filter((p) =>
+      p.name.toLowerCase().includes(name.toLowerCase())
+    ).slice(0, 5);
+  }, [formData.name, products, isEditDialogOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(e.target as Node) &&
+        nameInputRef.current &&
+        !nameInputRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectSuggestion = (product: ProductWithInventory) => {
+    setShowSuggestions(false);
+    setIsCreateDialogOpen(false);
+    setSelectedProduct(product);
+    const totalQty = product.inventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
+    setFormData({
+      name: product.name,
+      sku: product.sku || "",
+      category: product.category || "",
+      description: product.description || "",
+      price: product.price || "0",
+      costPrice: product.costPrice || "0",
+      isActive: product.isActive,
+      branch: product.inventory?.[0]?.branch || "ALFANI1",
+      initialQuantity: totalQty,
+    });
+    setIsEditDialogOpen(true);
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertProduct) => {
@@ -110,11 +155,11 @@ export default function Products() {
       branch: "ALFANI1",
       initialQuantity: 0,
     });
+    setShowSuggestions(false);
   };
 
   const handleEdit = (product: ProductWithInventory) => {
     setSelectedProduct(product);
-    const firstBranch = product.inventory?.[0];
     const totalQty = product.inventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
     setFormData({
       name: product.name,
@@ -124,7 +169,7 @@ export default function Products() {
       price: product.price || "0",
       costPrice: product.costPrice || "0",
       isActive: product.isActive,
-      branch: firstBranch?.branch || "ALFANI1",
+      branch: product.inventory?.[0]?.branch || "ALFANI1",
       initialQuantity: totalQty,
     });
     setIsEditDialogOpen(true);
@@ -285,15 +330,57 @@ export default function Products() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-2 relative">
               <Label htmlFor="name">{t("productName")} *</Label>
               <Input
                 id="name"
+                ref={nameInputRef}
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
                 placeholder={t("enterProductName")}
+                autoComplete="off"
                 data-testid="input-product-name"
               />
+              {showSuggestions && nameSuggestions.length > 0 && isCreateDialogOpen && (
+                <div
+                  ref={suggestionsRef}
+                  className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto"
+                  data-testid="product-name-suggestions"
+                >
+                  <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground border-b border-border bg-muted/50">
+                    {t("existingProducts") || "Existing products"}
+                  </div>
+                  {nameSuggestions.map((product) => {
+                    const totalQty = product.inventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
+                    return (
+                      <button
+                        key={product.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                        onClick={() => selectSuggestion(product)}
+                        data-testid={`suggestion-product-${product.id}`}
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm truncate">{product.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {product.sku ? `SKU: ${product.sku}` : ""}{product.category ? ` · ${product.category}` : ""}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs font-medium">{parseFloat(product.price || "0").toFixed(2)} LYD</span>
+                          <Badge variant="outline" className="text-xs">
+                            {totalQty} {t("inStock") || "in stock"}
+                          </Badge>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="sku">{t("sku")}</Label>
