@@ -1600,6 +1600,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stock Purchase (Stock-In with financial transaction)
+  app.post("/api/stock-purchases", requireProductManagement, async (req, res) => {
+    try {
+      const {
+        productId,
+        branch,
+        quantity,
+        costPerUnit,
+        purchaseType,
+        currency,
+        exchangeRate,
+        supplierName,
+        supplierInvoiceNumber,
+        safeId,
+        supplierId,
+      } = req.body;
+
+      if (!productId || !branch || !quantity || !costPerUnit || !purchaseType) {
+        return res.status(400).json({ message: "Missing required fields: productId, branch, quantity, costPerUnit, purchaseType" });
+      }
+
+      const qty = parseInt(quantity);
+      const unitCost = parseFloat(costPerUnit);
+      if (qty <= 0 || unitCost < 0) {
+        return res.status(400).json({ message: "Quantity must be positive and cost cannot be negative" });
+      }
+
+      const totalCost = qty * unitCost;
+      const rate = exchangeRate ? parseFloat(exchangeRate) : null;
+
+      const product = await storage.getProduct(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      let safeTransactionId: string | null = null;
+
+      if (purchaseType === "paid_now") {
+        if (!safeId) {
+          return res.status(400).json({ message: "Cashbox (safe) selection is required for paid purchases" });
+        }
+
+        const amountUSD = currency === "USD" ? String(totalCost) : (rate ? String(totalCost / rate) : "0");
+        const amountLYD = currency === "LYD" ? String(totalCost) : (rate ? String(totalCost * rate) : "0");
+
+        const safeTx = await storage.createSafeTransaction({
+          safeId: safeId,
+          type: "withdrawal",
+          amountUSD: amountUSD,
+          amountLYD: amountLYD,
+          exchangeRate: rate ? String(rate) : null,
+          description: `Stock Purchase – Paid: ${product.name} (${qty} units @ ${unitCost} ${currency})${supplierName ? ` from ${supplierName}` : ""}`,
+          referenceType: "stock_purchase",
+          referenceId: null,
+          createdByUserId: req.user!.id,
+        });
+        safeTransactionId = safeTx.id;
+      }
+
+      if (purchaseType === "on_credit") {
+        if (supplierId) {
+          const supplier = await storage.getAllSuppliers();
+          const sup = supplier.find(s => s.id === supplierId);
+          if (sup) {
+            const newBalance = parseFloat(sup.balanceOwed || "0") + totalCost;
+            await storage.updateSupplier(supplierId, { balanceOwed: String(newBalance) });
+          }
+        }
+      }
+
+      const existingInventory = await storage.getBranchInventory(productId);
+      const branchInv = existingInventory.find(inv => inv.branch === branch);
+      const currentQty = branchInv ? branchInv.quantity : 0;
+
+      await storage.upsertBranchInventory({
+        productId,
+        branch,
+        quantity: currentQty + qty,
+        lowStockThreshold: branchInv?.lowStockThreshold || 5,
+      });
+
+      if (product.costPrice !== null && product.costPrice !== undefined) {
+        const currentCost = parseFloat(product.costPrice || "0");
+        if (currentCost === 0 || unitCost !== currentCost) {
+          await storage.updateProduct(productId, { costPrice: String(unitCost) });
+        }
+      } else {
+        await storage.updateProduct(productId, { costPrice: String(unitCost) });
+      }
+
+      const purchase = await storage.createStockPurchase({
+        productId,
+        productName: product.name,
+        branch,
+        quantity: qty,
+        costPerUnit: String(unitCost),
+        totalCost: String(totalCost),
+        purchaseType,
+        currency: currency || "LYD",
+        exchangeRate: rate ? String(rate) : null,
+        supplierName: supplierName || null,
+        supplierInvoiceNumber: supplierInvoiceNumber || null,
+        safeId: safeId || null,
+        supplierId: supplierId || null,
+        safeTransactionId,
+        createdByUserId: req.user!.id,
+      });
+
+      const ledgerDescription = purchaseType === "paid_now"
+        ? `Stock Purchase – Paid: ${product.name} (${qty} × ${unitCost} ${currency})`
+        : `Stock Purchase – Credit: ${product.name} (${qty} × ${unitCost} ${currency})${supplierName ? ` - Supplier: ${supplierName}` : ""}`;
+
+      await storage.createAccountingEntry({
+        entryNumber: `SP-${Date.now()}`,
+        date: new Date(),
+        description: ledgerDescription,
+        debitAccountType: "inventory",
+        debitAccountId: branch,
+        creditAccountType: purchaseType === "paid_now" ? "cashbox" : "accounts_payable",
+        creditAccountId: purchaseType === "paid_now" ? (safeId || "") : (supplierId || "supplier"),
+        amountUSD: currency === "USD" ? String(totalCost) : (rate ? String(totalCost / rate) : "0"),
+        amountLYD: currency === "LYD" ? String(totalCost) : (rate ? String(totalCost * rate) : "0"),
+        exchangeRate: rate ? String(rate) : null,
+        referenceType: "stock_purchase",
+        referenceId: purchase.id,
+        createdByUserId: req.user!.id,
+      });
+
+      res.status(201).json(purchase);
+    } catch (error: any) {
+      console.error("Stock purchase error:", error?.stack || error?.message || error);
+      res.status(500).json({ message: "Failed to process stock purchase: " + (error?.message || "Unknown error") });
+    }
+  });
+
+  app.get("/api/stock-purchases", requireProductManagement, async (req, res) => {
+    try {
+      const purchases = await storage.getAllStockPurchases();
+      res.json(purchases);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch stock purchases" });
+    }
+  });
+
   app.get("/api/inventory/:productId", requireAuth, async (req, res) => {
     try {
       const inventory = await storage.getBranchInventory(req.params.productId);

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Pencil, Trash2, Package } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Package, PackagePlus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,8 +29,22 @@ export default function Products() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isStockInDialogOpen, setIsStockInDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductWithInventory | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [stockInData, setStockInData] = useState({
+    productId: "",
+    branch: "ALFANI1",
+    quantity: 1,
+    costPerUnit: "0",
+    purchaseType: "paid_now" as "paid_now" | "on_credit",
+    currency: "LYD",
+    exchangeRate: "",
+    supplierName: "",
+    supplierInvoiceNumber: "",
+    safeId: "",
+    supplierId: "",
+  });
   const nameInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState<Partial<InsertProduct> & { branch?: string; initialQuantity?: number }>({
@@ -47,6 +61,16 @@ export default function Products() {
 
   const { data: products = [], isLoading } = useQuery<ProductWithInventory[]>({
     queryKey: ["/api/products/with-inventory"],
+  });
+
+  const { data: safes = [] } = useQuery<any[]>({
+    queryKey: ["/api/safes"],
+    enabled: canManage,
+  });
+
+  const { data: suppliersList = [] } = useQuery<any[]>({
+    queryKey: ["/api/suppliers"],
+    enabled: canManage,
   });
 
   const nameSuggestions = useMemo(() => {
@@ -145,6 +169,66 @@ export default function Products() {
       toast({ title: t("error"), description: t("failedDeleteProduct"), variant: "destructive" });
     },
   });
+
+  const stockInMutation = useMutation({
+    mutationFn: async (data: typeof stockInData) => {
+      const response = await apiRequest("POST", "/api/stock-purchases", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/safe-transactions"] });
+      setIsStockInDialogOpen(false);
+      setSelectedProduct(null);
+      resetStockInForm();
+      toast({ title: t("success"), description: t("stockInSuccess") || "Stock added successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: t("error"), description: error?.message || t("stockInFailed") || "Failed to add stock", variant: "destructive" });
+    },
+  });
+
+  const resetStockInForm = () => {
+    setStockInData({
+      productId: "",
+      branch: "ALFANI1",
+      quantity: 1,
+      costPerUnit: "0",
+      purchaseType: "paid_now",
+      currency: "LYD",
+      exchangeRate: "",
+      supplierName: "",
+      supplierInvoiceNumber: "",
+      safeId: "",
+      supplierId: "",
+    });
+  };
+
+  const handleStockIn = (product: ProductWithInventory) => {
+    setSelectedProduct(product);
+    setStockInData({
+      ...stockInData,
+      productId: product.id,
+      costPerUnit: product.costPrice || "0",
+      branch: product.inventory?.[0]?.branch || "ALFANI1",
+    });
+    setIsStockInDialogOpen(true);
+  };
+
+  const handleStockInSubmit = () => {
+    if (!stockInData.productId || stockInData.quantity <= 0 || parseFloat(stockInData.costPerUnit) <= 0) {
+      toast({ title: t("error"), description: t("fillRequiredFields") || "Please fill all required fields", variant: "destructive" });
+      return;
+    }
+    if (stockInData.purchaseType === "paid_now" && !stockInData.safeId) {
+      toast({ title: t("error"), description: t("selectCashbox") || "Please select a cashbox for paid purchases", variant: "destructive" });
+      return;
+    }
+    stockInMutation.mutate(stockInData);
+  };
 
   const resetForm = () => {
     setFormData({
@@ -282,6 +366,15 @@ export default function Products() {
                     {canManage && (
                       <TableCell>
                         <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleStockIn(product)}
+                            data-testid={`button-stockin-product-${product.id}`}
+                            title={t("stockIn") || "Stock In"}
+                          >
+                            <PackagePlus className="h-4 w-4 text-green-600" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -492,6 +585,221 @@ export default function Products() {
               data-testid="button-confirm-delete-product"
             >
               {deleteMutation.isPending ? t("deleting") : t("delete")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>)}
+
+      {canManage && (<Dialog open={isStockInDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsStockInDialogOpen(false);
+          setSelectedProduct(null);
+          resetStockInForm();
+        }
+      }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PackagePlus className="h-5 w-5 text-green-600" />
+              {t("stockIn") || "Stock In"} {selectedProduct ? `- ${selectedProduct.name}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>{t("branch") || "Branch"} *</Label>
+              <Select
+                value={stockInData.branch}
+                onValueChange={(value) => setStockInData({ ...stockInData, branch: value })}
+              >
+                <SelectTrigger data-testid="select-stockin-branch">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALFANI1">ALFANI1</SelectItem>
+                  <SelectItem value="ALFANI2">ALFANI2</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>{t("purchaseType") || "Purchase Type"} *</Label>
+              <Select
+                value={stockInData.purchaseType}
+                onValueChange={(value: "paid_now" | "on_credit") => setStockInData({ ...stockInData, purchaseType: value })}
+              >
+                <SelectTrigger data-testid="select-stockin-purchase-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paid_now">{t("paidNow") || "Paid Now"}</SelectItem>
+                  <SelectItem value="on_credit">{t("onCredit") || "On Credit"}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>{t("quantity") || "Quantity"} *</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={stockInData.quantity}
+                  onChange={(e) => setStockInData({ ...stockInData, quantity: parseInt(e.target.value) || 0 })}
+                  data-testid="input-stockin-quantity"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>{t("costPerUnit") || "Cost Per Unit"} *</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={stockInData.costPerUnit}
+                  onChange={(e) => setStockInData({ ...stockInData, costPerUnit: e.target.value })}
+                  data-testid="input-stockin-cost"
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-muted rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">{t("totalCost") || "Total Cost"}:</span>
+                <span className="text-lg font-bold">
+                  {(stockInData.quantity * parseFloat(stockInData.costPerUnit || "0")).toFixed(2)} {stockInData.currency}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>{t("currency") || "Currency"} *</Label>
+                <Select
+                  value={stockInData.currency}
+                  onValueChange={(value) => setStockInData({ ...stockInData, currency: value })}
+                >
+                  <SelectTrigger data-testid="select-stockin-currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="LYD">LYD</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>{t("exchangeRate") || "Exchange Rate"}</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder={t("optional") || "Optional"}
+                  value={stockInData.exchangeRate}
+                  onChange={(e) => setStockInData({ ...stockInData, exchangeRate: e.target.value })}
+                  data-testid="input-stockin-exchange-rate"
+                />
+              </div>
+            </div>
+
+            {stockInData.purchaseType === "paid_now" && (
+              <div className="grid gap-2">
+                <Label>{t("cashbox") || "Cashbox"} *</Label>
+                <Select
+                  value={stockInData.safeId}
+                  onValueChange={(value) => setStockInData({ ...stockInData, safeId: value })}
+                >
+                  <SelectTrigger data-testid="select-stockin-safe">
+                    <SelectValue placeholder={t("selectCashbox") || "Select Cashbox"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {safes.filter((s: any) => s.isActive).map((safe: any) => (
+                      <SelectItem key={safe.id} value={safe.id}>
+                        {safe.name} ({safe.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {stockInData.purchaseType === "on_credit" && (
+              <div className="grid gap-2">
+                <Label>{t("supplier") || "Supplier"}</Label>
+                <Select
+                  value={stockInData.supplierId}
+                  onValueChange={(value) => {
+                    const supplier = suppliersList.find((s: any) => s.id === value);
+                    setStockInData({ 
+                      ...stockInData, 
+                      supplierId: value,
+                      supplierName: supplier?.name || stockInData.supplierName 
+                    });
+                  }}
+                >
+                  <SelectTrigger data-testid="select-stockin-supplier">
+                    <SelectValue placeholder={t("selectSupplier") || "Select Supplier"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliersList.filter((s: any) => s.isActive).map((supplier: any) => (
+                      <SelectItem key={supplier.id} value={supplier.id}>
+                        {supplier.name} ({supplier.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>{t("supplierName") || "Supplier Name"}</Label>
+                <Input
+                  placeholder={t("optional") || "Optional"}
+                  value={stockInData.supplierName}
+                  onChange={(e) => setStockInData({ ...stockInData, supplierName: e.target.value })}
+                  data-testid="input-stockin-supplier-name"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>{t("invoiceNumber") || "Invoice Number"}</Label>
+                <Input
+                  placeholder={t("optional") || "Optional"}
+                  value={stockInData.supplierInvoiceNumber}
+                  onChange={(e) => setStockInData({ ...stockInData, supplierInvoiceNumber: e.target.value })}
+                  data-testid="input-stockin-invoice-number"
+                />
+              </div>
+            </div>
+
+            {stockInData.purchaseType === "paid_now" && (
+              <div className="p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-sm">
+                <p className="text-red-700 dark:text-red-300 font-medium">
+                  {t("paidNowNote") || "This will deduct the total cost from the selected cashbox and create a financial record."}
+                </p>
+              </div>
+            )}
+
+            {stockInData.purchaseType === "on_credit" && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg text-sm">
+                <p className="text-amber-700 dark:text-amber-300 font-medium">
+                  {t("onCreditNote") || "No cashbox deduction. The total cost will be added to the supplier's payable balance."}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsStockInDialogOpen(false);
+              setSelectedProduct(null);
+              resetStockInForm();
+            }}>
+              {t("cancel")}
+            </Button>
+            <Button
+              onClick={handleStockInSubmit}
+              disabled={stockInMutation.isPending}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="button-submit-stock-in"
+            >
+              {stockInMutation.isPending ? (t("processing") || "Processing...") : (t("confirmStockIn") || "Confirm Stock In")}
             </Button>
           </DialogFooter>
         </DialogContent>

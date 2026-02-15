@@ -263,6 +263,29 @@ export const invoiceItems = pgTable("invoice_items", {
   lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
 });
 
+// Stock Purchases (tracks every stock-in with financial impact)
+export const purchaseTypeEnum = pgEnum("purchase_type", ["paid_now", "on_credit"]);
+
+export const stockPurchases = pgTable("stock_purchases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").notNull().references(() => products.id),
+  productName: text("product_name").notNull(),
+  branch: branchEnum("branch").notNull(),
+  quantity: integer("quantity").notNull(),
+  costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 15, scale: 2 }).notNull(),
+  purchaseType: purchaseTypeEnum("purchase_type").notNull(),
+  currency: text("currency").notNull().default("LYD"),
+  exchangeRate: decimal("exchange_rate", { precision: 10, scale: 4 }),
+  supplierName: text("supplier_name"),
+  supplierInvoiceNumber: text("supplier_invoice_number"),
+  safeId: varchar("safe_id").references(() => safes.id),
+  supplierId: varchar("supplier_id").references(() => suppliers.id),
+  safeTransactionId: varchar("safe_transaction_id").references(() => safeTransactions.id),
+  createdByUserId: varchar("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // ============ END CAR ACCESSORIES PRODUCTS ============
 
 export const users = pgTable("users", {
@@ -638,6 +661,11 @@ export const insertBranchInventorySchema = createInsertSchema(branchInventory).o
   updatedAt: true,
 });
 
+export const insertStockPurchaseSchema = createInsertSchema(stockPurchases).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertSalesInvoiceSchema = createInsertSchema(salesInvoices).omit({
   id: true,
   createdAt: true,
@@ -744,6 +772,9 @@ export type Product = typeof products.$inferSelect;
 
 export type InsertBranchInventory = z.infer<typeof insertBranchInventorySchema>;
 export type BranchInventory = typeof branchInventory.$inferSelect;
+
+export type InsertStockPurchase = z.infer<typeof insertStockPurchaseSchema>;
+export type StockPurchase = typeof stockPurchases.$inferSelect;
 
 export type InsertSalesInvoice = z.infer<typeof insertSalesInvoiceSchema>;
 export type SalesInvoice = typeof salesInvoices.$inferSelect;

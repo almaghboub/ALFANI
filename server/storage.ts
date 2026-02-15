@@ -96,6 +96,9 @@ import {
   type OwnerAccount,
   type InsertCapitalTransaction,
   type CapitalTransaction,
+  type StockPurchase,
+  type InsertStockPurchase,
+  stockPurchases,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./auth";
@@ -241,6 +244,10 @@ export interface IStorage {
   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
   updateSupplier(id: string, supplier: Partial<InsertSupplier>): Promise<Supplier | undefined>;
   deleteSupplier(id: string): Promise<boolean>;
+
+  // Stock Purchases
+  getAllStockPurchases(): Promise<StockPurchase[]>;
+  createStockPurchase(purchase: InsertStockPurchase): Promise<StockPurchase>;
 
   // Receipts
   getAllReceipts(): Promise<Receipt[]>;
@@ -1812,6 +1819,16 @@ export class PostgreSQLStorage implements IStorage {
   async deleteSupplier(id: string): Promise<boolean> {
     const result = await db.delete(suppliers).where(eq(suppliers.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Stock Purchases
+  async getAllStockPurchases(): Promise<StockPurchase[]> {
+    return await db.select().from(stockPurchases).orderBy(desc(stockPurchases.createdAt));
+  }
+
+  async createStockPurchase(purchase: InsertStockPurchase): Promise<StockPurchase> {
+    const result = await db.insert(stockPurchases).values(purchase).returning();
+    return result[0];
   }
 
   // Receipts
