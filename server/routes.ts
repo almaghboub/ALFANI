@@ -6,7 +6,7 @@ import session from "express-session";
 import pgSession from "connect-pg-simple";
 import { storage } from "./storage";
 import { hashPassword, verifyPassword } from "./auth";
-import { requireAuth, requireOwner, requireOperational, requireDeliveryManager, requireShippingStaff, requireDeliveryAccess } from "./middleware";
+import { requireAuth, requireOwner, requireOperational, requireDeliveryManager, requireShippingStaff, requireDeliveryAccess, requireProductManagement } from "./middleware";
 import { ObjectStorageService } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import {
@@ -1456,10 +1456,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============ PRODUCTS & INVENTORY ROUTES ============
 
   // Products
+  const canManageProducts = (role: string) => role === "owner" || role === "stock_manager";
+
+  const stripCostPrice = (product: any, role: string) => {
+    if (canManageProducts(role)) return product;
+    const { costPrice, ...rest } = product;
+    return rest;
+  };
+
   app.get("/api/products", requireAuth, async (req, res) => {
     try {
       const products = await storage.getAllProducts();
-      res.json(products);
+      const role = req.user!.role;
+      res.json(products.map((p: any) => stripCostPrice(p, role)));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch products" });
     }
@@ -1468,7 +1477,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products/with-inventory", requireAuth, async (req, res) => {
     try {
       const products = await storage.getProductsWithInventory();
-      res.json(products);
+      const role = req.user!.role;
+      res.json(products.map((p: any) => stripCostPrice(p, role)));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch products with inventory" });
     }
@@ -1480,13 +1490,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
-      res.json(product);
+      res.json(stripCostPrice(product, req.user!.role));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch product" });
     }
   });
 
-  app.post("/api/products", requireAuth, async (req, res) => {
+  app.post("/api/products", requireProductManagement, async (req, res) => {
     try {
       const { branch, initialQuantity, ...productData } = req.body;
       
@@ -1541,7 +1551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/products/:id", requireAuth, async (req, res) => {
+  app.patch("/api/products/:id", requireProductManagement, async (req, res) => {
     try {
       const { branch, initialQuantity, ...productData } = req.body;
       const product = await storage.updateProduct(req.params.id, productData);
@@ -1564,7 +1574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/products/:id", requireAuth, async (req, res) => {
+  app.delete("/api/products/:id", requireProductManagement, async (req, res) => {
     try {
       const success = await storage.deleteProduct(req.params.id);
       if (!success) {

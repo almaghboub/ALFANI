@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/components/auth-provider";
 import type { Product, InsertProduct } from "@shared/schema";
 
 interface ProductWithInventory extends Product {
@@ -22,6 +23,8 @@ interface ProductWithInventory extends Product {
 export default function Products() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const canManage = user?.role === "owner" || user?.role === "stock_manager";
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -213,10 +216,12 @@ export default function Products() {
             data-testid="input-search-products"
           />
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-add-product">
-          <Plus className="h-4 w-4 mr-2" />
-          {t("addProduct")}
-        </Button>
+        {canManage && (
+          <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-add-product">
+            <Plus className="h-4 w-4 mr-2" />
+            {t("addProduct")}
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -245,10 +250,10 @@ export default function Products() {
                   <TableHead>{t("sku")}</TableHead>
                   <TableHead>{t("category")}</TableHead>
                   <TableHead>{t("price")}</TableHead>
-                  <TableHead>{t("costPrice")}</TableHead>
+                  {canManage && <TableHead>{t("costPrice")}</TableHead>}
                   <TableHead>{t("quantity")}</TableHead>
                   <TableHead>{t("status")}</TableHead>
-                  <TableHead>{t("actions")}</TableHead>
+                  {canManage && <TableHead>{t("actions")}</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -258,7 +263,7 @@ export default function Products() {
                     <TableCell>{product.sku || "-"}</TableCell>
                     <TableCell>{product.category || "-"}</TableCell>
                     <TableCell>{parseFloat(product.price || "0").toFixed(2)} LYD</TableCell>
-                    <TableCell>{parseFloat(product.costPrice || "0").toFixed(2)} LYD</TableCell>
+                    {canManage && <TableCell>{parseFloat(product.costPrice || "0").toFixed(2)} LYD</TableCell>}
                     <TableCell>
                       {(() => {
                         const totalQty = product.inventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
@@ -274,26 +279,28 @@ export default function Products() {
                         {product.isActive ? t("active") : t("inactive")}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(product)}
-                          data-testid={`button-edit-product-${product.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(product)}
-                          data-testid={`button-delete-product-${product.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {canManage && (
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(product)}
+                            data-testid={`button-edit-product-${product.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(product)}
+                            data-testid={`button-delete-product-${product.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -302,7 +309,7 @@ export default function Products() {
         </CardContent>
       </Card>
 
-      <Dialog open={isCreateDialogOpen || isEditDialogOpen} onOpenChange={(open) => {
+      {canManage && (<Dialog open={isCreateDialogOpen || isEditDialogOpen} onOpenChange={(open) => {
         if (!open) {
           setIsCreateDialogOpen(false);
           setIsEditDialogOpen(false);
@@ -466,9 +473,9 @@ export default function Products() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog>)}
 
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      {canManage && (<Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("deleteProduct")}</DialogTitle>
@@ -488,7 +495,7 @@ export default function Products() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog>)}
     </div>
   );
 }

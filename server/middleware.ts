@@ -59,3 +59,7 @@ export function requireShippingStaff(req: Request, res: Response, next: NextFunc
 export function requireDeliveryAccess(req: Request, res: Response, next: NextFunction) {
   return requireRole(["owner", "customer_service", "receptionist", "shipping_staff"])(req, res, next);
 }
+
+export function requireProductManagement(req: Request, res: Response, next: NextFunction) {
+  return requireRole(["owner", "stock_manager"])(req, res, next);
+}
