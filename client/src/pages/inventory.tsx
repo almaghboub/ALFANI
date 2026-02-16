@@ -37,7 +37,7 @@ export default function Inventory() {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
       setCurrentPage(1);
-    }, 400);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -61,6 +61,7 @@ export default function Inventory() {
       return res.json();
     },
     placeholderData: keepPreviousData,
+    staleTime: 10000,
   });
 
   const productsWithInventory = paginatedData?.products || [];
@@ -69,6 +70,7 @@ export default function Inventory() {
 
   const { data: productStats } = useQuery<{ total: number; active: number; lowStock: number; outOfStock: number }>({
     queryKey: ["/api/products/stats"],
+    staleTime: 15000,
   });
 
   const updateInventoryMutation = useMutation({

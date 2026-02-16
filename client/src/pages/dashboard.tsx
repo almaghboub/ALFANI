@@ -64,6 +64,7 @@ export default function Dashboard() {
 
   const { data: productStats } = useQuery<{ total: number; active: number; lowStock: number; outOfStock: number }>({
     queryKey: ["/api/products/stats"],
+    staleTime: 15000,
   });
 
   const { data: invoices = [] } = useQuery<Invoice[]>({

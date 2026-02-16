@@ -62,7 +62,7 @@ export default function Invoice() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
-    }, 400);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -76,6 +76,7 @@ export default function Invoice() {
       return res.json();
     },
     placeholderData: keepPreviousData,
+    staleTime: 10000,
   });
 
   const products = productsData?.products || [];

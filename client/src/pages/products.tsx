@@ -66,7 +66,7 @@ export default function Products() {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
       setCurrentPage(1);
-    }, 400);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -90,7 +90,25 @@ export default function Products() {
       return res.json();
     },
     placeholderData: keepPreviousData,
+    staleTime: 10000,
   });
+
+  useEffect(() => {
+    if (paginatedData && currentPage < (paginatedData.totalPages || 1)) {
+      const nextPage = currentPage + 1;
+      const params = new URLSearchParams({ page: String(nextPage), limit: String(pageSize) });
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      queryClient.prefetchQuery({
+        queryKey: ["/api/products/with-inventory", nextPage, pageSize, debouncedSearch],
+        queryFn: async () => {
+          const res = await fetch(`/api/products/with-inventory?${params}`, { credentials: "include" });
+          if (!res.ok) throw new Error("Failed to fetch products");
+          return res.json();
+        },
+        staleTime: 10000,
+      });
+    }
+  }, [currentPage, pageSize, debouncedSearch, paginatedData]);
 
   const products = paginatedData?.products || [];
   const totalProducts = paginatedData?.total || 0;

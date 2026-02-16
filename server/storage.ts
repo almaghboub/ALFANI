@@ -1963,16 +1963,19 @@ export class PostgreSQLStorage implements IStorage {
 
   async createProduct(product: InsertProduct): Promise<Product> {
     const result = await db.insert(products).values(product).returning();
+    this.invalidateProductCaches();
     return result[0];
   }
 
   async updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined> {
     const result = await db.update(products).set({ ...product, updatedAt: new Date() }).where(eq(products.id, id)).returning();
+    this.invalidateProductCaches();
     return result[0];
   }
 
   async deleteProduct(id: string): Promise<boolean> {
     const result = await db.delete(products).where(eq(products.id, id)).returning();
+    this.invalidateProductCaches();
     return result.length > 0;
   }
 
@@ -1986,9 +1989,18 @@ export class PostgreSQLStorage implements IStorage {
     }));
   }
 
+  private _statsCache: { data: { total: number; active: number; lowStock: number; outOfStock: number } | null; timestamp: number } = { data: null, timestamp: 0 };
+  private _totalCountCache: { count: number; timestamp: number } = { count: 0, timestamp: 0 };
+
+  invalidateProductCaches() {
+    this._statsCache.data = null;
+    this._totalCountCache.timestamp = 0;
+  }
+
   async getProductsPaginated(params: { page: number; limit: number; search?: string; category?: string }): Promise<{ products: ProductWithInventory[]; total: number; page: number; totalPages: number }> {
     const { page, limit, search, category } = params;
     const offset = (page - 1) * limit;
+    const hasFilters = (search && search.trim()) || (category && category.trim());
 
     const conditions = [];
     if (search && search.trim()) {
@@ -2007,11 +2019,27 @@ export class PostgreSQLStorage implements IStorage {
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [countResult] = await db
-      .select({ value: count() })
-      .from(products)
-      .where(whereClause);
-    const total = countResult?.value || 0;
+    let total: number;
+    if (!hasFilters) {
+      const now = Date.now();
+      if (now - this._totalCountCache.timestamp < 10000) {
+        total = this._totalCountCache.count;
+      } else {
+        const estResult = await db.execute(sql`SELECT reltuples::bigint AS estimate FROM pg_class WHERE relname = 'products'`);
+        const estRow = (estResult as any).rows?.[0] || estResult[0];
+        const estimate = Number(estRow?.estimate) || 0;
+        if (estimate > 1000) {
+          total = estimate;
+        } else {
+          const [countResult] = await db.select({ value: count() }).from(products);
+          total = Number(countResult?.value) || 0;
+        }
+        this._totalCountCache = { count: total, timestamp: now };
+      }
+    } else {
+      const [countResult] = await db.select({ value: count() }).from(products).where(whereClause);
+      total = Number(countResult?.value) || 0;
+    }
 
     const paginatedProducts = await db
       .select()
@@ -2030,9 +2058,16 @@ export class PostgreSQLStorage implements IStorage {
         .where(sql`${branchInventory.productId} IN (${sql.join(productIds.map(id => sql`${id}`), sql`, `)})`);
     }
 
+    const inventoryMap = new Map<string, BranchInventory[]>();
+    for (const inv of inventoryData) {
+      const existing = inventoryMap.get(inv.productId) || [];
+      existing.push(inv);
+      inventoryMap.set(inv.productId, existing);
+    }
+
     const productsWithInv: ProductWithInventory[] = paginatedProducts.map(product => ({
       ...product,
-      inventory: inventoryData.filter(inv => inv.productId === product.id),
+      inventory: inventoryMap.get(product.id) || [],
     }));
 
     return {
@@ -2044,6 +2079,11 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number }> {
+    const now = Date.now();
+    if (this._statsCache.data && now - this._statsCache.timestamp < 5000) {
+      return this._statsCache.data;
+    }
+
     const result = await db.execute(sql`
       SELECT
         (SELECT COUNT(*) FROM products)::int AS total,
@@ -2058,12 +2098,14 @@ export class PostgreSQLStorage implements IStorage {
       ) inv ON inv.product_id = p.id
     `);
     const row = (result as any).rows?.[0] || result[0] || {};
-    return {
+    const stats = {
       total: Number(row.total) || 0,
       active: Number(row.active) || 0,
       lowStock: Number(row.low_stock) || 0,
       outOfStock: Number(row.out_of_stock) || 0,
     };
+    this._statsCache = { data: stats, timestamp: now };
+    return stats;
   }
 
   async getBranchInventory(productId: string): Promise<BranchInventory[]> {
@@ -2079,9 +2121,11 @@ export class PostgreSQLStorage implements IStorage {
         .set({ quantity: inventory.quantity, lowStockThreshold: inventory.lowStockThreshold, updatedAt: new Date() })
         .where(eq(branchInventory.id, existing[0].id))
         .returning();
+      this.invalidateProductCaches();
       return result[0];
     } else {
       const result = await db.insert(branchInventory).values(inventory).returning();
+      this.invalidateProductCaches();
       return result[0];
     }
   }

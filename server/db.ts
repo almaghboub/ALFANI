@@ -17,6 +17,11 @@ const isProduction = process.env.NODE_ENV === "production";
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: isProduction ? { rejectUnauthorized: false } : undefined,
+  max: 20,
+  min: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+  statement_timeout: 10000,
 });
 export const db = drizzle(pool, { schema });
 
