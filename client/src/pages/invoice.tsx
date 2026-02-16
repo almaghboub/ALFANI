@@ -54,6 +54,8 @@ export default function Invoice() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [logoBase64, setLogoBase64] = useState<string>(logoPath);
+  const [discountType, setDiscountType] = useState<"amount" | "percentage">("amount");
+  const [discountValue, setDiscountValue] = useState<string>("");
 
   useEffect(() => {
     getLogoBase64(logoPath).then(setLogoBase64);
@@ -92,7 +94,7 @@ export default function Invoice() {
   }, [safes, selectedSafeId]);
 
   const createInvoiceMutation = useMutation({
-    mutationFn: async (data: { customerName: string; branch: string; items: CartItem[]; safeId: string | null }) => {
+    mutationFn: async (data: { customerName: string; branch: string; items: CartItem[]; safeId: string | null; discountType: string; discountValue: string }) => {
       const response = await apiRequest("POST", "/api/invoices", data);
       return response.json();
     },
@@ -105,6 +107,8 @@ export default function Invoice() {
       handlePrint();
       setCart([]);
       setCustomerName("");
+      setDiscountType("amount");
+      setDiscountValue("");
     },
     onError: () => {
       toast({ title: t("error"), description: t("failedCreateInvoice"), variant: "destructive" });
@@ -165,7 +169,19 @@ export default function Invoice() {
     setCart(cart.filter(item => item.productId !== productId));
   };
 
-  const getTotal = () => cart.reduce((sum, item) => sum + item.lineTotal, 0);
+  const getSubtotal = () => cart.reduce((sum, item) => sum + item.lineTotal, 0);
+
+  const getDiscountAmount = () => {
+    const subtotal = getSubtotal();
+    const dv = parseFloat(discountValue) || 0;
+    if (dv <= 0) return 0;
+    if (discountType === "percentage") {
+      return Math.min((subtotal * dv) / 100, subtotal);
+    }
+    return Math.min(dv, subtotal);
+  };
+
+  const getTotal = () => Math.max(getSubtotal() - getDiscountAmount(), 0);
 
   const handlePrint = () => {
     const isRtl = document.dir === 'rtl';
@@ -178,7 +194,9 @@ export default function Invoice() {
     const timeStr = new Date().toLocaleTimeString(isRtl ? 'ar-SA' : 'en-US', {
       hour: '2-digit', minute: '2-digit'
     });
-    const subtotal = getTotal();
+    const subtotal = getSubtotal();
+    const discountAmt = getDiscountAmount();
+    const finalTotal = getTotal();
     const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
 
     const printWindow = window.open('', '_blank');
@@ -485,9 +503,14 @@ export default function Invoice() {
                     <span class="label">${t("subtotal")}</span>
                     <span class="value">${subtotal.toFixed(2)} LYD</span>
                   </div>
+                  ${discountAmt > 0 ? `
+                  <div class="totals-row subtotal" style="color: #dc2626;">
+                    <span class="label">${t("discount")} ${discountType === 'percentage' ? `(${parseFloat(discountValue || '0')}%)` : ''}</span>
+                    <span class="value">-${discountAmt.toFixed(2)} LYD</span>
+                  </div>` : ''}
                   <div class="totals-row grand-total">
                     <span class="label">${t("total")}</span>
-                    <span class="value">${subtotal.toFixed(2)} LYD</span>
+                    <span class="value">${finalTotal.toFixed(2)} LYD</span>
                   </div>
                 </div>
               </div>
@@ -529,7 +552,7 @@ export default function Invoice() {
       toast({ title: t("error"), description: t("cartEmpty"), variant: "destructive" });
       return;
     }
-    createInvoiceMutation.mutate({ customerName, branch, items: cart, safeId: selectedSafeId || null });
+    createInvoiceMutation.mutate({ customerName, branch, items: cart, safeId: selectedSafeId || null, discountType, discountValue });
   };
 
   const filteredProducts = products.filter(product => product.isActive);
@@ -647,6 +670,35 @@ export default function Invoice() {
               </div>
               )}
               
+              <div>
+                <Label>{t("discount")}</Label>
+                <div className="flex gap-2">
+                  <Select value={discountType} onValueChange={(v) => setDiscountType(v as "amount" | "percentage")}>
+                    <SelectTrigger className="w-32" data-testid="select-discount-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="amount">{t("fixedAmount") || "Fixed (LYD)"}</SelectItem>
+                      <SelectItem value="percentage">{t("percentage") || "%"}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder={discountType === "percentage" ? "0%" : "0.00 LYD"}
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    data-testid="input-discount-value"
+                  />
+                </div>
+                {getDiscountAmount() > 0 && (
+                  <p className="text-sm text-red-500 mt-1" data-testid="text-discount-preview">
+                    -{getDiscountAmount().toFixed(2)} LYD {t("discountApplied") || "discount applied"}
+                  </p>
+                )}
+              </div>
+
               {cart.length > 0 ? (
                 <div className="border rounded-md">
                   <Table>
@@ -692,9 +744,23 @@ export default function Invoice() {
                 </div>
               )}
               
-              <div className="flex justify-between items-center pt-4 border-t">
-                <span className="text-lg font-semibold">{t("total")}</span>
-                <span className="text-2xl font-bold">{getTotal().toFixed(2)} LYD</span>
+              <div className="space-y-2 pt-4 border-t">
+                {getDiscountAmount() > 0 && (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{t("subtotal")}</span>
+                      <span className="text-sm">{getSubtotal().toFixed(2)} LYD</span>
+                    </div>
+                    <div className="flex justify-between items-center text-red-500">
+                      <span className="text-sm">{t("discount")} {discountType === "percentage" ? `(${discountValue}%)` : ""}</span>
+                      <span className="text-sm">-{getDiscountAmount().toFixed(2)} LYD</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-semibold">{t("total")}</span>
+                  <span className="text-2xl font-bold">{getTotal().toFixed(2)} LYD</span>
+                </div>
               </div>
               
               <div className="flex gap-2">

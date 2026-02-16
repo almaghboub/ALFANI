@@ -66,7 +66,7 @@ export default function Products() {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
       setCurrentPage(1);
-    }, 300);
+    }, 150);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -403,13 +403,10 @@ export default function Products() {
               <TableHeader>
                 <TableRow>
                   <TableHead>{t("productName")}</TableHead>
-                  <TableHead>{t("branch")}</TableHead>
-                  <TableHead>{t("sku")}</TableHead>
-                  <TableHead>{t("category")}</TableHead>
-                  <TableHead>{t("price")}</TableHead>
-                  {canManage && <TableHead>{t("costPrice")}</TableHead>}
                   <TableHead>{t("quantity")}</TableHead>
-                  <TableHead>{t("status")}</TableHead>
+                  {canManage && <TableHead>{t("costPrice")}</TableHead>}
+                  <TableHead>{t("price")}</TableHead>
+                  <TableHead>{t("branch")}</TableHead>
                   {canManage && <TableHead>{t("actions")}</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -417,17 +414,6 @@ export default function Products() {
                 {filteredProducts.map((product) => (
                   <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
                     <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>
-                      {product.inventory && product.inventory.length > 0 ? product.inventory.map((inv, idx) => (
-                        <Badge key={`${product.id}-${inv.branch}-${idx}`} variant="outline" className="mr-1">
-                          {t(inv.branch) || inv.branch}
-                        </Badge>
-                      )) : "-"}
-                    </TableCell>
-                    <TableCell>{product.sku || "-"}</TableCell>
-                    <TableCell>{product.category || "-"}</TableCell>
-                    <TableCell>{parseFloat(product.price || "0").toFixed(2)} LYD</TableCell>
-                    {canManage && <TableCell>{parseFloat(product.costPrice || "0").toFixed(2)} LYD</TableCell>}
                     <TableCell>
                       {(() => {
                         const totalQty = product.inventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
@@ -438,17 +424,22 @@ export default function Products() {
                         );
                       })()}
                     </TableCell>
+                    {canManage && <TableCell>{parseFloat(product.costPrice || "0").toFixed(2)} LYD</TableCell>}
+                    <TableCell>{parseFloat(product.price || "0").toFixed(2)} LYD</TableCell>
                     <TableCell>
-                      <Badge variant={product.isActive ? "default" : "secondary"}>
-                        {product.isActive ? t("active") : t("inactive")}
-                      </Badge>
+                      {product.inventory && product.inventory.length > 0 ? product.inventory.map((inv, idx) => (
+                        <Badge key={`${product.id}-${inv.branch}-${idx}`} variant="outline" className="mr-1">
+                          {t(inv.branch) || inv.branch}
+                        </Badge>
+                      )) : "-"}
                     </TableCell>
                     {canManage && (
                       <TableCell>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1">
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
+                            className="h-8 w-8"
                             onClick={() => handleStockIn(product)}
                             data-testid={`button-stockin-product-${product.id}`}
                             title={t("stockIn") || "Stock In"}
@@ -457,7 +448,8 @@ export default function Products() {
                           </Button>
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
+                            className="h-8 w-8"
                             onClick={() => handleEdit(product)}
                             data-testid={`button-edit-product-${product.id}`}
                           >
@@ -465,7 +457,8 @@ export default function Products() {
                           </Button>
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
+                            className="h-8 w-8"
                             onClick={() => handleDelete(product)}
                             data-testid={`button-delete-product-${product.id}`}
                           >

@@ -568,6 +568,20 @@ async function migrateProductsTable() {
       `);
     }
 
+    // Add discount columns to sales_invoices if missing
+    const invoiceCols = await pool.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'sales_invoices'
+    `);
+    const invColNames = invoiceCols.rows.map((r: any) => r.column_name);
+    if (!invColNames.includes('subtotal')) {
+      console.log("Migrating: adding discount columns to sales_invoices...");
+      await pool.query(`ALTER TABLE sales_invoices ADD COLUMN subtotal DECIMAL(10,2)`);
+      await pool.query(`ALTER TABLE sales_invoices ADD COLUMN discount_type TEXT DEFAULT 'amount'`);
+      await pool.query(`ALTER TABLE sales_invoices ADD COLUMN discount_value DECIMAL(10,2) DEFAULT 0`);
+      await pool.query(`ALTER TABLE sales_invoices ADD COLUMN discount_amount DECIMAL(10,2) DEFAULT 0`);
+    }
+
     // Create invoice_items table if missing
     const invoiceItemsExists = await pool.query(`
       SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'invoice_items'

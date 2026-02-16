@@ -2503,7 +2503,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/invoices", requireAuth, async (req, res) => {
     try {
-      const { customerName, branch, items, safeId } = req.body;
+      const { customerName, branch, items, safeId, discountType, discountValue } = req.body;
       
       if (!customerName || typeof customerName !== 'string' || customerName.trim() === '') {
         return res.status(400).json({ message: "Customer name is required" });
@@ -2545,12 +2545,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
       
-      const totalAmount = itemsData.reduce((sum: number, item: any) => sum + parseFloat(item.lineTotal), 0);
+      const subtotal = itemsData.reduce((sum: number, item: any) => sum + parseFloat(item.lineTotal), 0);
+      
+      let discountAmt = 0;
+      const dType = discountType || "amount";
+      const dValue = parseFloat(discountValue) || 0;
+      if (dValue > 0) {
+        if (dType === "percentage") {
+          discountAmt = Math.min((subtotal * dValue) / 100, subtotal);
+        } else {
+          discountAmt = Math.min(dValue, subtotal);
+        }
+      }
+      const totalAmount = Math.max(subtotal - discountAmt, 0);
       
       const invoiceData = {
         invoiceNumber,
         customerName: customerName.trim(),
         branch,
+        subtotal: String(subtotal),
+        discountType: dType,
+        discountValue: String(dValue),
+        discountAmount: String(discountAmt),
         totalAmount: String(totalAmount),
         safeId: safeId || null,
       };
