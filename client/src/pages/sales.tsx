@@ -638,7 +638,7 @@ export default function Sales() {
                         <TableCell className="font-semibold">{Number(invoice.totalAmount).toFixed(2)} LYD</TableCell>
                         <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <div className="flex gap-1">
+                          <div className="flex flex-wrap gap-1">
                             <Button size="sm" variant="outline" onClick={() => handleView(invoice)} data-testid={`button-view-${invoice.id}`} title={t("invoiceDetails")}>
                               <Eye className="h-4 w-4" />
                             </Button>
@@ -648,8 +648,9 @@ export default function Sales() {
                             <Button size="sm" variant="outline" onClick={() => handleEdit(invoice)} data-testid={`button-edit-${invoice.id}`} title={t("editInvoice")}>
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleReturnClick(invoice)} data-testid={`button-return-${invoice.id}`} title={t("returnProducts")} className="text-amber-600 hover:text-amber-700">
-                              <RotateCcw className="h-4 w-4" />
+                            <Button size="sm" variant="outline" onClick={() => handleReturnClick(invoice)} data-testid={`button-return-${invoice.id}`} className="text-amber-600 hover:text-amber-700 border-amber-300">
+                              <RotateCcw className="h-4 w-4 mr-1" />
+                              <span>{t("returnProducts")}</span>
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => handleDeleteClick(invoice)} data-testid={`button-delete-${invoice.id}`} title={t("deleteInvoice")} className="text-red-600 hover:text-red-700">
                               <Trash2 className="h-4 w-4" />
