@@ -124,13 +124,29 @@ export default function Products() {
     enabled: canManage,
   });
 
-  const nameSuggestions = useMemo(() => {
+  const [suggestionSearch, setSuggestionSearch] = useState("");
+  const { data: serverSuggestions = [] } = useQuery<ProductWithInventory[]>({
+    queryKey: ["/api/products/search", suggestionSearch],
+    queryFn: async () => {
+      if (!suggestionSearch) return [];
+      const res = await fetch(`/api/products/search?q=${encodeURIComponent(suggestionSearch)}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: suggestionSearch.length >= 1 && isCreateDialogOpen && !isEditDialogOpen,
+    staleTime: 5000,
+  });
+  const nameSuggestions = suggestionSearch.length >= 1 ? serverSuggestions : [];
+
+  useEffect(() => {
     const name = formData.name?.trim() || "";
-    if (name.length < 1 || isEditDialogOpen) return [];
-    return products.filter((p) =>
-      p.name.toLowerCase().includes(name.toLowerCase())
-    ).slice(0, 5);
-  }, [formData.name, products, isEditDialogOpen]);
+    if (name.length < 1 || isEditDialogOpen) {
+      setSuggestionSearch("");
+      return;
+    }
+    const timer = setTimeout(() => setSuggestionSearch(name), 200);
+    return () => clearTimeout(timer);
+  }, [formData.name, isEditDialogOpen]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

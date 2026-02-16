@@ -1493,6 +1493,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/products/search", requireAuth, async (req, res) => {
+    try {
+      const query = (req.query.q as string) || "";
+      if (!query.trim()) {
+        return res.json([]);
+      }
+      const role = req.user!.role;
+      const results = await storage.searchProductsByName(query, 10);
+      res.json(results.map((p: any) => stripCostPrice(p, role)));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to search products" });
+    }
+  });
+
   app.get("/api/products/with-inventory", requireAuth, async (req, res) => {
     try {
       const role = req.user!.role;

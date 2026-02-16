@@ -284,6 +284,7 @@ export interface IStorage {
   updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
   deleteProduct(id: string): Promise<boolean>;
   getProductsWithInventory(): Promise<ProductWithInventory[]>;
+  searchProductsByName(query: string, limit?: number): Promise<ProductWithInventory[]>;
   getProductsPaginated(params: { page: number; limit: number; search?: string; category?: string }): Promise<{ products: ProductWithInventory[]; total: number; page: number; totalPages: number }>;
 
   // Branch Inventory
@@ -1998,6 +1999,33 @@ export class PostgreSQLStorage implements IStorage {
     return allProducts.map(product => ({
       ...product,
       inventory: allInventory.filter(inv => inv.productId === product.id),
+    }));
+  }
+
+  async searchProductsByName(query: string, maxResults: number = 10): Promise<ProductWithInventory[]> {
+    const searchTerm = `%${query.trim()}%`;
+    const matchedProducts = await db
+      .select()
+      .from(products)
+      .where(or(
+        ilike(products.name, searchTerm),
+        ilike(products.sku, searchTerm),
+        ilike(products.category, searchTerm)
+      ))
+      .orderBy(desc(products.createdAt))
+      .limit(maxResults);
+
+    if (matchedProducts.length === 0) return [];
+
+    const productIds = matchedProducts.map(p => p.id);
+    const inventoryData = await db
+      .select()
+      .from(branchInventory)
+      .where(sql`${branchInventory.productId} IN (${sql.join(productIds.map(id => sql`${id}`), sql`, `)})`);
+
+    return matchedProducts.map(product => ({
+      ...product,
+      inventory: inventoryData.filter(inv => inv.productId === product.id),
     }));
   }
 
