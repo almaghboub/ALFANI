@@ -403,6 +403,7 @@ export default function Products() {
               <TableHeader>
                 <TableRow>
                   <TableHead>{t("productName")}</TableHead>
+                  <TableHead>{t("branch")}</TableHead>
                   <TableHead>{t("sku")}</TableHead>
                   <TableHead>{t("category")}</TableHead>
                   <TableHead>{t("price")}</TableHead>
@@ -416,6 +417,13 @@ export default function Products() {
                 {filteredProducts.map((product) => (
                   <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
                     <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell>
+                      {product.inventory && product.inventory.length > 0 ? product.inventory.map((inv, idx) => (
+                        <Badge key={`${product.id}-${inv.branch}-${idx}`} variant="outline" className="mr-1">
+                          {t(inv.branch) || inv.branch}
+                        </Badge>
+                      )) : "-"}
+                    </TableCell>
                     <TableCell>{product.sku || "-"}</TableCell>
                     <TableCell>{product.category || "-"}</TableCell>
                     <TableCell>{parseFloat(product.price || "0").toFixed(2)} LYD</TableCell>
