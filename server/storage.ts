@@ -287,6 +287,7 @@ export interface IStorage {
   // Branch Inventory
   getBranchInventory(productId: string): Promise<BranchInventory[]>;
   upsertBranchInventory(inventory: InsertBranchInventory): Promise<BranchInventory>;
+  deleteBranchInventory(id: string): Promise<boolean>;
   getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number }>;
   
   // Sales Invoices
@@ -2128,6 +2129,12 @@ export class PostgreSQLStorage implements IStorage {
       this.invalidateProductCaches();
       return result[0];
     }
+  }
+
+  async deleteBranchInventory(id: string): Promise<boolean> {
+    const result = await db.delete(branchInventory).where(eq(branchInventory.id, id)).returning();
+    this.invalidateProductCaches();
+    return result.length > 0;
   }
 
   async getAllInvoices(): Promise<SalesInvoiceWithItems[]> {

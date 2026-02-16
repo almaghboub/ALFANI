@@ -1588,13 +1588,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      if (branch && initialQuantity !== undefined) {
-        await storage.upsertBranchInventory({
-          productId: product.id,
-          branch,
-          quantity: parseInt(initialQuantity) || 0,
-          lowStockThreshold: 5,
-        });
+      if (branch) {
+        const existingInventory = await storage.getBranchInventory(product.id);
+        const otherBranch = branch === "ALFANI1" ? "ALFANI2" : "ALFANI1";
+        const oldBranchRecord = existingInventory.find(inv => inv.branch === otherBranch);
+
+        if (oldBranchRecord) {
+          const qty = initialQuantity !== undefined ? parseInt(initialQuantity) || 0 : oldBranchRecord.quantity;
+          await storage.upsertBranchInventory({
+            productId: product.id,
+            branch,
+            quantity: qty,
+            lowStockThreshold: oldBranchRecord.lowStockThreshold || 5,
+          });
+          await storage.deleteBranchInventory(oldBranchRecord.id);
+        } else if (initialQuantity !== undefined) {
+          await storage.upsertBranchInventory({
+            productId: product.id,
+            branch,
+            quantity: parseInt(initialQuantity) || 0,
+            lowStockThreshold: 5,
+          });
+        }
       }
 
       res.json(product);
