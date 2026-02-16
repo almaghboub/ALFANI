@@ -2308,6 +2308,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/goods-capital-details", requireOwner, async (req, res) => {
+    try {
+      const details = await storage.getGoodsCapitalDetails();
+      res.json(details);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch goods capital details" });
+    }
+  });
+
   // Expense Categories
   app.get("/api/expense-categories", requireAuth, async (req, res) => {
     try {

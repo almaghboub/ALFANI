@@ -275,6 +275,11 @@ export interface IStorage {
     recentTransactions: Array<{ type: string; amount: number; date: Date }>;
   }>;
 
+  getGoodsCapitalDetails(): Promise<{
+    items: Array<{ productId: string; productName: string; costPrice: number; sellPrice: number; branch: string; quantity: number; totalValue: number }>;
+    totalCapital: number;
+  }>;
+
   // ============ PRODUCTS & INVENTORY ============
   
   // Products
@@ -1961,6 +1966,35 @@ export class PostgreSQLStorage implements IStorage {
       goodsCapitalUSD: 0,
       recentTransactions,
     };
+  }
+
+  async getGoodsCapitalDetails(): Promise<{
+    items: Array<{ productId: string; productName: string; costPrice: number; sellPrice: number; branch: string; quantity: number; totalValue: number }>;
+    totalCapital: number;
+  }> {
+    const result = await db.select({
+      productId: products.id,
+      productName: products.name,
+      costPrice: products.costPrice,
+      sellPrice: products.price,
+      branch: branchInventory.branch,
+      quantity: branchInventory.quantity,
+    }).from(branchInventory)
+      .innerJoin(products, eq(branchInventory.productId, products.id))
+      .where(sql`${branchInventory.quantity} > 0 AND ${products.costPrice} IS NOT NULL`);
+
+    const items = result.map(r => ({
+      productId: r.productId,
+      productName: r.productName,
+      costPrice: Number(r.costPrice),
+      sellPrice: Number(r.sellPrice),
+      branch: r.branch,
+      quantity: r.quantity,
+      totalValue: r.quantity * Number(r.costPrice),
+    }));
+
+    const totalCapital = items.reduce((sum, i) => sum + i.totalValue, 0);
+    return { items, totalCapital };
   }
 
   // ============ PRODUCTS & INVENTORY ============

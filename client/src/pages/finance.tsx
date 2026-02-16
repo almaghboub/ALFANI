@@ -109,6 +109,19 @@ export default function Finance() {
     queryKey: ["/api/financial-summary"],
   });
 
+  interface GoodsCapitalItem {
+    productId: string;
+    productName: string;
+    costPrice: number;
+    sellPrice: number;
+    branch: string;
+    quantity: number;
+    totalValue: number;
+  }
+  const { data: goodsCapitalDetails } = useQuery<{ items: GoodsCapitalItem[]; totalCapital: number }>({
+    queryKey: ["/api/goods-capital-details"],
+  });
+
   const { data: safes = [], isLoading: safesLoading } = useQuery<Safe[]>({
     queryKey: ["/api/safes"],
   });
@@ -497,6 +510,50 @@ export default function Finance() {
               </CardContent>
             </Card>
           </div>
+
+          {goodsCapitalDetails && goodsCapitalDetails.items.length > 0 && (
+            <Card data-testid="card-goods-capital-details">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-amber-500" />
+                  {t("goodsCapitalDetails") || "Goods Capital Details"}
+                </CardTitle>
+                <CardDescription>{t("goodsCapitalDetailsDesc") || "Breakdown of inventory value by product"}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-md overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t("product") || "Product"}</TableHead>
+                        <TableHead>{t("branch") || "Branch"}</TableHead>
+                        <TableHead className="text-center">{t("quantity") || "Qty"}</TableHead>
+                        <TableHead className="text-center">{t("costPrice") || "Cost Price"}</TableHead>
+                        <TableHead className="text-center">{t("sellPrice") || "Sell Price"}</TableHead>
+                        <TableHead className="text-center">{t("totalValue") || "Total Value"}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {goodsCapitalDetails.items.map((item, idx) => (
+                        <TableRow key={`${item.productId}-${item.branch}-${idx}`}>
+                          <TableCell className="font-medium">{item.productName}</TableCell>
+                          <TableCell><Badge variant="outline">{item.branch}</Badge></TableCell>
+                          <TableCell className="text-center">{item.quantity}</TableCell>
+                          <TableCell className="text-center">{item.costPrice.toFixed(2)} LYD</TableCell>
+                          <TableCell className="text-center">{item.sellPrice.toFixed(2)} LYD</TableCell>
+                          <TableCell className="text-center font-semibold text-amber-600">{item.totalValue.toFixed(2)} LYD</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="flex justify-between items-center mt-4 pt-3 border-t">
+                  <span className="font-semibold">{t("totalGoodsCapital") || "Total Goods Capital"}</span>
+                  <span className="text-xl font-bold text-amber-600">{goodsCapitalDetails.totalCapital.toFixed(2)} LYD</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
