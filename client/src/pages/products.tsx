@@ -199,7 +199,13 @@ export default function Products() {
         window.location.href = "/";
         return;
       }
-      toast({ title: t("error"), description: t("failedCreateProduct"), variant: "destructive" });
+      const errorMsg = error?.message?.replace(/^\d+:\s*/, "") || t("failedCreateProduct");
+      let parsedMsg = errorMsg;
+      try {
+        const parsed = JSON.parse(errorMsg);
+        if (parsed.message) parsedMsg = parsed.message;
+      } catch {}
+      toast({ title: t("error"), description: parsedMsg, variant: "destructive" });
     },
   });
 
@@ -335,6 +341,10 @@ export default function Products() {
   };
 
   const handleSubmit = () => {
+    if (!formData.name || formData.name.trim() === "") {
+      toast({ title: t("error"), description: t("productNameRequired") || "Product name is required", variant: "destructive" });
+      return;
+    }
     if (isEditDialogOpen && selectedProduct) {
       updateMutation.mutate({ id: selectedProduct.id, data: formData as InsertProduct });
     } else {
