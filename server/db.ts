@@ -582,6 +582,28 @@ async function migrateProductsTable() {
       `);
     }
 
+    // Enable pg_trgm for fast text search on 100k+ products
+    try {
+      await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
+    } catch (e) { /* extension may already exist */ }
+
+    // Create performance indexes for large product catalogs (100k+)
+    const indexQueries = [
+      `CREATE INDEX IF NOT EXISTS idx_products_name ON products (name)`,
+      `CREATE INDEX IF NOT EXISTS idx_products_sku ON products (sku)`,
+      `CREATE INDEX IF NOT EXISTS idx_products_category ON products (category)`,
+      `CREATE INDEX IF NOT EXISTS idx_products_created_at ON products (created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_products_is_active ON products (is_active)`,
+      `CREATE INDEX IF NOT EXISTS idx_branch_inventory_product_id ON branch_inventory (product_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_branch_inventory_branch ON branch_inventory (branch)`,
+      `CREATE INDEX IF NOT EXISTS idx_products_name_trgm ON products USING gin (name gin_trgm_ops)`,
+      `CREATE INDEX IF NOT EXISTS idx_products_sku_trgm ON products USING gin (sku gin_trgm_ops)`,
+      `CREATE INDEX IF NOT EXISTS idx_products_category_trgm ON products USING gin (category gin_trgm_ops)`,
+    ];
+    for (const q of indexQueries) {
+      try { await pool.query(q); } catch (e) { /* index may already exist */ }
+    }
+
     console.log("Products table migration complete.");
   } catch (error) {
     console.error("Error migrating products table:", error);

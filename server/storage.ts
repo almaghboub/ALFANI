@@ -2044,36 +2044,25 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number }> {
-    const [totalResult] = await db.select({ value: count() }).from(products);
-    const [activeResult] = await db.select({ value: count() }).from(products).where(eq(products.isActive, true));
-    
-    const inventoryAgg = await db
-      .select({
-        productId: branchInventory.productId,
-        totalQty: sql<number>`COALESCE(SUM(${branchInventory.quantity}), 0)`.as("total_qty"),
-        threshold: sql<number>`MIN(${branchInventory.lowStockThreshold})`.as("threshold"),
-      })
-      .from(branchInventory)
-      .groupBy(branchInventory.productId);
-
-    const allProductIds = await db.select({ id: products.id }).from(products);
-    const inventoryMap = new Map(inventoryAgg.map(i => [i.productId, { qty: Number(i.totalQty), threshold: Number(i.threshold) }]));
-
-    let outOfStock = 0;
-    let lowStock = 0;
-    for (const p of allProductIds) {
-      const inv = inventoryMap.get(p.id);
-      const qty = inv?.qty || 0;
-      const threshold = inv?.threshold || 5;
-      if (qty === 0) outOfStock++;
-      else if (qty <= threshold) lowStock++;
-    }
-
+    const result = await db.execute(sql`
+      SELECT
+        (SELECT COUNT(*) FROM products)::int AS total,
+        (SELECT COUNT(*) FROM products WHERE is_active = true)::int AS active,
+        COUNT(*) FILTER (WHERE COALESCE(inv.total_qty, 0) = 0)::int AS out_of_stock,
+        COUNT(*) FILTER (WHERE COALESCE(inv.total_qty, 0) > 0 AND COALESCE(inv.total_qty, 0) <= COALESCE(inv.min_threshold, 5))::int AS low_stock
+      FROM products p
+      LEFT JOIN (
+        SELECT product_id, SUM(quantity) AS total_qty, MIN(low_stock_threshold) AS min_threshold
+        FROM branch_inventory
+        GROUP BY product_id
+      ) inv ON inv.product_id = p.id
+    `);
+    const row = (result as any).rows?.[0] || result[0] || {};
     return {
-      total: totalResult?.value || 0,
-      active: activeResult?.value || 0,
-      lowStock,
-      outOfStock,
+      total: Number(row.total) || 0,
+      active: Number(row.active) || 0,
+      lowStock: Number(row.low_stock) || 0,
+      outOfStock: Number(row.out_of_stock) || 0,
     };
   }
 
