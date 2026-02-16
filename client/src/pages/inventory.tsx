@@ -1,7 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Warehouse, AlertTriangle, Package } from "lucide-react";
+import { Plus, Search, Warehouse, AlertTriangle, Package, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,9 @@ export default function Inventory() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 50;
   const [selectedBranch, setSelectedBranch] = useState<Branch>("ALFANI1");
   const [isAddStockDialogOpen, setIsAddStockDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -30,12 +33,42 @@ export default function Inventory() {
     lowStockThreshold: 5,
   });
 
-  const { data: productsWithInventory = [], isLoading } = useQuery<ProductWithInventory[]>({
-    queryKey: ["/api/products/with-inventory"],
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  interface PaginatedResponse {
+    products: ProductWithInventory[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }
+
+  const { data: paginatedData, isLoading } = useQuery<PaginatedResponse>({
+    queryKey: ["/api/products/with-inventory", "inventory", currentPage, pageSize, debouncedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(pageSize),
+      });
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      const res = await fetch(`/api/products/with-inventory?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch products");
+      return res.json();
+    },
+    placeholderData: keepPreviousData,
   });
 
-  const { data: products = [] } = useQuery<Product[]>({
-    queryKey: ["/api/products"],
+  const productsWithInventory = paginatedData?.products || [];
+  const totalProducts = paginatedData?.total || 0;
+  const totalPages = paginatedData?.totalPages || 1;
+
+  const { data: productStats } = useQuery<{ total: number; active: number; lowStock: number; outOfStock: number }>({
+    queryKey: ["/api/products/stats"],
   });
 
   const updateInventoryMutation = useMutation({
@@ -83,24 +116,14 @@ export default function Inventory() {
     return product.inventory?.find(inv => inv.branch === branch);
   };
 
-  const filteredProducts = productsWithInventory.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredProducts = productsWithInventory;
 
-  const getLowStockCount = (branch: Branch) => {
-    return productsWithInventory.filter(product => {
-      const inv = getInventoryForBranch(product, branch);
-      return inv && inv.quantity <= inv.lowStockThreshold && inv.quantity > 0;
-    }).length;
+  const getLowStockCount = (_branch: Branch) => {
+    return productStats?.lowStock || 0;
   };
 
-  const getOutOfStockCount = (branch: Branch) => {
-    return productsWithInventory.filter(product => {
-      const inv = getInventoryForBranch(product, branch);
-      return !inv || inv.quantity === 0;
-    }).length;
+  const getOutOfStockCount = (_branch: Branch) => {
+    return productStats?.outOfStock || 0;
   };
 
   const getTotalStock = (branch: Branch) => {
@@ -281,6 +304,30 @@ export default function Inventory() {
               )}
             </TabsContent>
           </Tabs>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <p className="text-sm text-muted-foreground" data-testid="text-inventory-count">
+                {t("showing")} {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalProducts)} {t("of")} {totalProducts}
+              </p>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1} data-testid="button-inv-first-page">
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} data-testid="button-inv-prev-page">
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="px-3 py-1 text-sm font-medium" data-testid="text-inv-page-info">
+                  {currentPage} / {totalPages}
+                </span>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} data-testid="button-inv-next-page">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} data-testid="button-inv-last-page">
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

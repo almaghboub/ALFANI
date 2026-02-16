@@ -102,7 +102,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./auth";
-import { eq, desc, sql, or, ilike } from "drizzle-orm";
+import { eq, desc, sql, or, ilike, and, count } from "drizzle-orm";
 import { db } from "./db";
 
 export interface IStorage {
@@ -282,10 +282,12 @@ export interface IStorage {
   updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
   deleteProduct(id: string): Promise<boolean>;
   getProductsWithInventory(): Promise<ProductWithInventory[]>;
+  getProductsPaginated(params: { page: number; limit: number; search?: string; category?: string }): Promise<{ products: ProductWithInventory[]; total: number; page: number; totalPages: number }>;
 
   // Branch Inventory
   getBranchInventory(productId: string): Promise<BranchInventory[]>;
   upsertBranchInventory(inventory: InsertBranchInventory): Promise<BranchInventory>;
+  getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number }>;
   
   // Sales Invoices
   getAllInvoices(): Promise<SalesInvoiceWithItems[]>;
@@ -1982,6 +1984,97 @@ export class PostgreSQLStorage implements IStorage {
       ...product,
       inventory: allInventory.filter(inv => inv.productId === product.id),
     }));
+  }
+
+  async getProductsPaginated(params: { page: number; limit: number; search?: string; category?: string }): Promise<{ products: ProductWithInventory[]; total: number; page: number; totalPages: number }> {
+    const { page, limit, search, category } = params;
+    const offset = (page - 1) * limit;
+
+    const conditions = [];
+    if (search && search.trim()) {
+      const searchTerm = `%${search.trim()}%`;
+      conditions.push(
+        or(
+          ilike(products.name, searchTerm),
+          ilike(products.sku, searchTerm),
+          ilike(products.category, searchTerm)
+        )
+      );
+    }
+    if (category && category.trim()) {
+      conditions.push(eq(products.category, category));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [countResult] = await db
+      .select({ value: count() })
+      .from(products)
+      .where(whereClause);
+    const total = countResult?.value || 0;
+
+    const paginatedProducts = await db
+      .select()
+      .from(products)
+      .where(whereClause)
+      .orderBy(desc(products.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const productIds = paginatedProducts.map(p => p.id);
+    let inventoryData: BranchInventory[] = [];
+    if (productIds.length > 0) {
+      inventoryData = await db
+        .select()
+        .from(branchInventory)
+        .where(sql`${branchInventory.productId} IN (${sql.join(productIds.map(id => sql`${id}`), sql`, `)})`);
+    }
+
+    const productsWithInv: ProductWithInventory[] = paginatedProducts.map(product => ({
+      ...product,
+      inventory: inventoryData.filter(inv => inv.productId === product.id),
+    }));
+
+    return {
+      products: productsWithInv,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number }> {
+    const [totalResult] = await db.select({ value: count() }).from(products);
+    const [activeResult] = await db.select({ value: count() }).from(products).where(eq(products.isActive, true));
+    
+    const inventoryAgg = await db
+      .select({
+        productId: branchInventory.productId,
+        totalQty: sql<number>`COALESCE(SUM(${branchInventory.quantity}), 0)`.as("total_qty"),
+        threshold: sql<number>`MIN(${branchInventory.lowStockThreshold})`.as("threshold"),
+      })
+      .from(branchInventory)
+      .groupBy(branchInventory.productId);
+
+    const allProductIds = await db.select({ id: products.id }).from(products);
+    const inventoryMap = new Map(inventoryAgg.map(i => [i.productId, { qty: Number(i.totalQty), threshold: Number(i.threshold) }]));
+
+    let outOfStock = 0;
+    let lowStock = 0;
+    for (const p of allProductIds) {
+      const inv = inventoryMap.get(p.id);
+      const qty = inv?.qty || 0;
+      const threshold = inv?.threshold || 5;
+      if (qty === 0) outOfStock++;
+      else if (qty <= threshold) lowStock++;
+    }
+
+    return {
+      total: totalResult?.value || 0,
+      active: activeResult?.value || 0,
+      lowStock,
+      outOfStock,
+    };
   }
 
   async getBranchInventory(productId: string): Promise<BranchInventory[]> {

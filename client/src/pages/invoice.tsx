@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Minus, Printer, Trash2, ShoppingCart } from "lucide-react";
@@ -52,15 +52,33 @@ export default function Invoice() {
   const [selectedSafeId, setSelectedSafeId] = useState<string>("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [logoBase64, setLogoBase64] = useState<string>(logoPath);
 
   useEffect(() => {
     getLogoBase64(logoPath).then(setLogoBase64);
   }, []);
 
-  const { data: products = [], isLoading } = useQuery<ProductWithInventory[]>({
-    queryKey: ["/api/products/with-inventory"],
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const { data: productsData, isLoading } = useQuery<{ products: ProductWithInventory[]; total: number }>({
+    queryKey: ["/api/products/with-inventory", "invoice", 1, 50, debouncedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: "1", limit: "50" });
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      const res = await fetch(`/api/products/with-inventory?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch products");
+      return res.json();
+    },
+    placeholderData: keepPreviousData,
   });
+
+  const products = productsData?.products || [];
 
   const { data: safes = [] } = useQuery<Safe[]>({
     queryKey: ["/api/safes"],
@@ -513,11 +531,7 @@ export default function Invoice() {
     createInvoiceMutation.mutate({ customerName, branch, items: cart, safeId: selectedSafeId || null });
   };
 
-  const filteredProducts = products.filter(product => 
-    product.isActive && 
-    (product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-     (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase())))
-  );
+  const filteredProducts = products.filter(product => product.isActive);
 
   const getAvailableQuantity = (product: ProductWithInventory) => {
     const branchInventory = product.inventory.find(inv => inv.branch === branch);

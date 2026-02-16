@@ -1464,6 +1464,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return rest;
   };
 
+  app.get("/api/products/stats", requireAuth, async (req, res) => {
+    try {
+      const stats = await storage.getProductStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch product stats" });
+    }
+  });
+
   app.get("/api/products", requireAuth, async (req, res) => {
     try {
       const products = await storage.getAllProducts();
@@ -1476,9 +1485,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/products/with-inventory", requireAuth, async (req, res) => {
     try {
-      const products = await storage.getProductsWithInventory();
       const role = req.user!.role;
-      res.json(products.map((p: any) => stripCostPrice(p, role)));
+
+      if (req.query.page) {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+        const search = (req.query.search as string) || "";
+        const category = (req.query.category as string) || "";
+
+        const result = await storage.getProductsPaginated({ page, limit, search, category });
+        res.json({
+          products: result.products.map((p: any) => stripCostPrice(p, role)),
+          total: result.total,
+          page: result.page,
+          totalPages: result.totalPages,
+        });
+      } else {
+        const products = await storage.getProductsWithInventory();
+        res.json(products.map((p: any) => stripCostPrice(p, role)));
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch products with inventory" });
     }

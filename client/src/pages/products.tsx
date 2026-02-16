@@ -1,7 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Pencil, Trash2, Package, PackagePlus } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Package, PackagePlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,9 @@ export default function Products() {
   const { user } = useAuth();
   const canManage = user?.role === "owner" || user?.role === "stock_manager";
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 50;
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -59,9 +62,39 @@ export default function Products() {
     initialQuantity: 0,
   });
 
-  const { data: products = [], isLoading } = useQuery<ProductWithInventory[]>({
-    queryKey: ["/api/products/with-inventory"],
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  interface PaginatedResponse {
+    products: ProductWithInventory[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }
+
+  const { data: paginatedData, isLoading } = useQuery<PaginatedResponse>({
+    queryKey: ["/api/products/with-inventory", currentPage, pageSize, debouncedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(pageSize),
+      });
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      const res = await fetch(`/api/products/with-inventory?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch products");
+      return res.json();
+    },
+    placeholderData: keepPreviousData,
   });
+
+  const products = paginatedData?.products || [];
+  const totalProducts = paginatedData?.total || 0;
+  const totalPages = paginatedData?.totalPages || 1;
 
   const { data: safes = [] } = useQuery<any[]>({
     queryKey: ["/api/safes"],
@@ -275,12 +308,7 @@ export default function Products() {
     }
   };
 
-  const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (product.category && product.category.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredProducts = products;
 
   return (
     <div className="flex-1 p-6 space-y-6">
@@ -398,6 +426,54 @@ export default function Products() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <p className="text-sm text-muted-foreground" data-testid="text-products-count">
+                {t("showing")} {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalProducts)} {t("of")} {totalProducts} {t("products")}
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  data-testid="button-first-page"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  data-testid="button-prev-page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="px-3 py-1 text-sm font-medium" data-testid="text-page-info">
+                  {currentPage} / {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  data-testid="button-next-page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  data-testid="button-last-page"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

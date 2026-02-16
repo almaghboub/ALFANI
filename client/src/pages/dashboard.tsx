@@ -32,16 +32,6 @@ interface FinancialSummary {
   recentTransactions: Array<{ type: string; amount: number; date: string }>;
 }
 
-interface ProductWithInventory {
-  id: string;
-  name: string;
-  sku: string;
-  price: string;
-  costPrice: string;
-  isActive: boolean;
-  branchInventory?: Array<{ branch: string; quantity: number; lowStockThreshold: number }>;
-}
-
 interface Invoice {
   id: string;
   invoiceNumber: string;
@@ -72,8 +62,8 @@ export default function Dashboard() {
     enabled: isOwner,
   });
 
-  const { data: products = [] } = useQuery<ProductWithInventory[]>({
-    queryKey: ["/api/products/with-inventory"],
+  const { data: productStats } = useQuery<{ total: number; active: number; lowStock: number; outOfStock: number }>({
+    queryKey: ["/api/products/stats"],
   });
 
   const { data: invoices = [] } = useQuery<Invoice[]>({
@@ -85,17 +75,10 @@ export default function Dashboard() {
     enabled: isOwner,
   });
 
-  const totalProducts = products.length;
-  const activeProducts = products.filter(p => p.isActive).length;
-  const lowStockProducts = products.filter(p => {
-    const totalQty = p.branchInventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
-    const threshold = p.branchInventory?.[0]?.lowStockThreshold || 5;
-    return totalQty > 0 && totalQty <= threshold;
-  });
-  const outOfStockProducts = products.filter(p => {
-    const totalQty = p.branchInventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
-    return totalQty === 0;
-  });
+  const totalProducts = productStats?.total || 0;
+  const activeProducts = productStats?.active || 0;
+  const lowStockCount = productStats?.lowStock || 0;
+  const outOfStockCount = productStats?.outOfStock || 0;
 
   const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount || "0"), 0);
 
@@ -357,7 +340,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {lowStockProducts.length > 0 || outOfStockProducts.length > 0 ? (
+          {(lowStockCount > 0 || outOfStockCount > 0) ? (
             <Card className="border-border/50 animate-fade-in" data-testid="card-stock-alerts">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -365,34 +348,31 @@ export default function Dashboard() {
                   {t('stockAlerts') || "Stock Alerts"}
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  {lowStockProducts.length} {t('lowStock') || "low stock"}, {outOfStockProducts.length} {t('outOfStock') || "out of stock"}
+                  {lowStockCount} {t('lowStock') || "low stock"}, {outOfStockCount} {t('outOfStock') || "out of stock"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 max-h-56 overflow-y-auto scrollbar-thin">
-                  {outOfStockProducts.map(p => (
-                    <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200/50 dark:border-red-800/30" data-testid={`alert-outofstock-${p.id}`}>
+                <div className="space-y-3">
+                  {outOfStockCount > 0 && (
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200/50 dark:border-red-800/30" data-testid="alert-outofstock-summary">
                       <div>
-                        <p className="font-medium text-sm">{p.name}</p>
-                        <p className="text-[11px] text-muted-foreground">{p.sku || "-"}</p>
+                        <p className="font-medium text-sm">{t('outOfStock') || "Out of Stock"}</p>
+                        <p className="text-[11px] text-muted-foreground">{t('productsNeedRestock') || "Products need restocking"}</p>
                       </div>
-                      <Badge variant="destructive" className="text-[10px] font-semibold">{t('outOfStock') || "Out of Stock"}</Badge>
+                      <Badge variant="destructive" className="text-sm font-semibold">{outOfStockCount}</Badge>
                     </div>
-                  ))}
-                  {lowStockProducts.map(p => {
-                    const qty = p.branchInventory?.reduce((s, bi) => s + bi.quantity, 0) || 0;
-                    return (
-                      <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/30" data-testid={`alert-lowstock-${p.id}`}>
-                        <div>
-                          <p className="font-medium text-sm">{p.name}</p>
-                          <p className="text-[11px] text-muted-foreground">{p.sku || "-"}</p>
-                        </div>
-                        <Badge variant="outline" className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700">
-                          {qty} {t('remaining') || "remaining"}
-                        </Badge>
+                  )}
+                  {lowStockCount > 0 && (
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/30" data-testid="alert-lowstock-summary">
+                      <div>
+                        <p className="font-medium text-sm">{t('lowStock') || "Low Stock"}</p>
+                        <p className="text-[11px] text-muted-foreground">{t('productsBelowThreshold') || "Products below threshold"}</p>
                       </div>
-                    );
-                  })}
+                      <Badge variant="outline" className="text-sm font-semibold text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                        {lowStockCount}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
