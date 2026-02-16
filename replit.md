@@ -2,6 +2,8 @@
 
 This project is a comprehensive logistics and order management system built with React, Express, and PostgreSQL. It offers role-based access for various staff (owner, customer service, receptionist, sorter, stock manager, shipping), enabling management of orders, customers, inventory, profits, and delivery tasks. Key features include modern authentication, real-time data, bilingual support (English/Arabic), a responsive UI, streamlined data entry, and a complete shipping/delivery task management system. The system aims to optimize logistics, enhance profit tracking, and improve delivery coordination. It includes advanced features like an owner-only performance report system with key KPIs and a comprehensive LYD currency conversion system tracking per-order exchange rates.
 
+**Performance**: Optimized for 100,000+ products with server-side pagination (50 items/page, max 200), pg_trgm GIN trigram indexes for fast text search, pure SQL stats aggregation, and debounced search (400ms). All product endpoints are paginated - no full-table loads.
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
