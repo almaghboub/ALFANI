@@ -2583,21 +2583,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (customerName && typeof customerName === 'string') {
         invoiceData.customerName = customerName.trim();
       }
-
-      const branchChanged = branch && (branch === 'ALFANI1' || branch === 'ALFANI2') && branch !== existingInvoice.branch;
+      if (branch && (branch === 'ALFANI1' || branch === 'ALFANI2')) {
+        invoiceData.branch = branch;
+      }
 
       let itemsData: any[] | undefined;
-      if (branchChanged) {
-        invoiceData.branch = branch;
-        itemsData = existingInvoice.items.map(item => ({
-          invoiceId: id,
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unitPrice: String(item.unitPrice),
-          lineTotal: String(item.lineTotal),
-        }));
-      } else if (items && Array.isArray(items) && items.length > 0) {
+      if (items && Array.isArray(items) && items.length > 0) {
+        const targetBranch = invoiceData.branch || existingInvoice.branch;
+        const stockCheck = await storage.checkInvoiceStock(targetBranch, items.filter((item: any) => {
+          const existingItem = existingInvoice.items.find(ei => ei.productId === item.productId);
+          if (!existingItem) return true;
+          return item.quantity > existingItem.quantity;
+        }).map((item: any) => {
+          const existingItem = existingInvoice.items.find(ei => ei.productId === item.productId);
+          const additionalQty = existingItem ? item.quantity - existingItem.quantity : item.quantity;
+          return { ...item, quantity: additionalQty };
+        }).filter((item: any) => item.quantity > 0));
+
+        if (!stockCheck.success) {
+          return res.status(400).json({ message: stockCheck.message });
+        }
+
         itemsData = items.map((item: any) => {
           const lineTotal = item.quantity * item.unitPrice;
           return {
@@ -2609,14 +2615,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lineTotal: String(lineTotal),
           };
         });
-        const totalAmount = itemsData.reduce((sum: number, item: any) => sum + parseFloat(item.lineTotal), 0);
+        const totalAmount = itemsData!.reduce((sum: number, item: any) => sum + parseFloat(item.lineTotal), 0);
         invoiceData.totalAmount = String(totalAmount);
       }
 
+      const oldTotal = Number(existingInvoice.totalAmount);
       const invoice = await storage.updateInvoice(id, invoiceData, itemsData);
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
+
+      const newTotal = Number(invoice.totalAmount);
+      if (existingInvoice.safeId && Math.abs(newTotal - oldTotal) > 0.01) {
+        const userId = (req.user as any)?.id || 'system';
+        const diff = newTotal - oldTotal;
+        await storage.createSafeTransaction({
+          safeId: existingInvoice.safeId,
+          type: diff > 0 ? 'deposit' : 'withdrawal',
+          amountUSD: "0",
+          amountLYD: String(Math.abs(diff).toFixed(2)),
+          description: `Invoice edit: ${existingInvoice.invoiceNumber} - ${invoice.customerName}`,
+          referenceType: diff > 0 ? 'invoice_edit_add' : 'invoice_edit_return',
+          referenceId: id,
+          createdByUserId: userId,
+        });
+      }
+
       res.json(invoice);
     } catch (error) {
       console.error("Failed to update invoice:", error);

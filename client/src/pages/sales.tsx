@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { History, Printer, Eye, Search, Pencil, Trash2, RotateCcw } from "lucide-react";
+import { History, Printer, Eye, Search, Pencil, Trash2, RotateCcw, Plus, Minus, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,16 @@ import { Label } from "@/components/ui/label";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { SalesInvoiceWithItems } from "@shared/schema";
+import type { SalesInvoiceWithItems, ProductWithInventory } from "@shared/schema";
 import logoPath from "@assets/alfani-logo.png";
+
+type EditItem = {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  isNew?: boolean;
+};
 
 function getLogoBase64(src: string): Promise<string> {
   return new Promise((resolve) => {
@@ -49,6 +57,11 @@ export default function Sales() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editCustomerName, setEditCustomerName] = useState("");
   const [editBranch, setEditBranch] = useState<"ALFANI1" | "ALFANI2">("ALFANI1");
+  const [editItems, setEditItems] = useState<EditItem[]>([]);
+  const [editProductSearch, setEditProductSearch] = useState("");
+  const [editSearchDebounced, setEditSearchDebounced] = useState("");
+  const [showEditProductResults, setShowEditProductResults] = useState(false);
+  const editSearchRef = useRef<HTMLDivElement>(null);
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<SalesInvoiceWithItems | null>(null);
@@ -61,6 +74,33 @@ export default function Sales() {
     getLogoBase64(logoPath).then(setLogoBase64);
   }, []);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setEditSearchDebounced(editProductSearch), 300);
+    return () => clearTimeout(timer);
+  }, [editProductSearch]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (editSearchRef.current && !editSearchRef.current.contains(e.target as Node)) {
+        setShowEditProductResults(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const { data: editSearchResults = [] } = useQuery<ProductWithInventory[]>({
+    queryKey: ["/api/products/search", editSearchDebounced],
+    queryFn: async () => {
+      if (!editSearchDebounced) return [];
+      const res = await fetch(`/api/products/search?q=${encodeURIComponent(editSearchDebounced)}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: editSearchDebounced.length >= 1 && isEditDialogOpen,
+    staleTime: 5000,
+  });
+
   const { data: invoices = [], isLoading } = useQuery<SalesInvoiceWithItems[]>({
     queryKey: ["/api/invoices"],
   });
@@ -72,11 +112,16 @@ export default function Sales() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
       setIsEditDialogOpen(false);
+      setEditItems([]);
+      setEditProductSearch("");
       toast({ title: t("invoiceUpdated") });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to update invoice", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Error", description: error?.message || "Failed to update invoice", variant: "destructive" });
     },
   });
 
@@ -132,16 +177,68 @@ export default function Sales() {
     setSelectedInvoice(invoice);
     setEditCustomerName(invoice.customerName);
     setEditBranch(invoice.branch as "ALFANI1" | "ALFANI2");
+    setEditItems(invoice.items.map(item => ({
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: Number(item.unitPrice),
+    })));
+    setEditProductSearch("");
+    setShowEditProductResults(false);
     setIsEditDialogOpen(true);
   };
 
   const handleEditSave = () => {
-    if (!selectedInvoice) return;
+    if (!selectedInvoice || editItems.length === 0) return;
     editMutation.mutate({
       id: selectedInvoice.id,
-      data: { customerName: editCustomerName, branch: editBranch },
+      data: {
+        customerName: editCustomerName,
+        branch: editBranch,
+        items: editItems.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        })),
+      },
     });
   };
+
+  const handleEditAddProduct = (product: ProductWithInventory) => {
+    const existing = editItems.find(i => i.productId === product.id);
+    if (existing) {
+      setEditItems(prev => prev.map(i =>
+        i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i
+      ));
+    } else {
+      setEditItems(prev => [...prev, {
+        productId: product.id,
+        productName: product.name,
+        quantity: 1,
+        unitPrice: Number(product.price),
+        isNew: true,
+      }]);
+    }
+    setEditProductSearch("");
+    setShowEditProductResults(false);
+  };
+
+  const handleEditRemoveItem = (productId: string) => {
+    setEditItems(prev => prev.filter(i => i.productId !== productId));
+  };
+
+  const handleEditQuantityChange = (productId: string, newQty: number) => {
+    if (newQty <= 0) {
+      handleEditRemoveItem(productId);
+      return;
+    }
+    setEditItems(prev => prev.map(i =>
+      i.productId === productId ? { ...i, quantity: newQty } : i
+    ));
+  };
+
+  const editTotal = editItems.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
   const handleDeleteClick = (invoice: SalesInvoiceWithItems) => {
     setInvoiceToDelete(invoice);
@@ -730,42 +827,178 @@ export default function Sales() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) { setEditItems([]); setEditProductSearch(""); setShowEditProductResults(false); }
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{t("editInvoice")}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              {t("editInvoice")}
+            </DialogTitle>
             <DialogDescription>
-              {selectedInvoice?.invoiceNumber}
+              {selectedInvoice?.invoiceNumber} - {t("editInvoiceDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label>{t("customerName")}</Label>
-              <Input
-                value={editCustomerName}
-                onChange={(e) => setEditCustomerName(e.target.value)}
-                data-testid="input-edit-customer-name"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>{t("customerName")}</Label>
+                <Input
+                  value={editCustomerName}
+                  onChange={(e) => setEditCustomerName(e.target.value)}
+                  data-testid="input-edit-customer-name"
+                />
+              </div>
+              <div>
+                <Label>{t("branch")}</Label>
+                <Select value={editBranch} onValueChange={(v) => setEditBranch(v as "ALFANI1" | "ALFANI2")}>
+                  <SelectTrigger data-testid="select-edit-branch">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALFANI1">ALFANI 1</SelectItem>
+                    <SelectItem value="ALFANI2">ALFANI 2</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div>
-              <Label>{t("branch")}</Label>
-              <Select value={editBranch} onValueChange={(v) => setEditBranch(v as "ALFANI1" | "ALFANI2")}>
-                <SelectTrigger data-testid="select-edit-branch">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALFANI1">ALFANI 1</SelectItem>
-                  <SelectItem value="ALFANI2">ALFANI 2</SelectItem>
-                </SelectContent>
-              </Select>
+
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold">{t("invoiceItems")}</Label>
+              <div className="border rounded-md mt-2">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("product")}</TableHead>
+                      <TableHead className="text-center w-[140px]">{t("quantity")}</TableHead>
+                      <TableHead className="text-center">{t("unitPrice")}</TableHead>
+                      <TableHead className="text-center">{t("total")}</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {editItems.map((item) => (
+                      <TableRow key={item.productId} className={item.isNew ? "bg-green-50 dark:bg-green-950/20" : ""}>
+                        <TableCell>
+                          <span className="font-medium">{item.productName}</span>
+                          {item.isNew && <Badge variant="outline" className="ml-2 text-xs text-green-600 border-green-300">{t("new")}</Badge>}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-7 w-7"
+                              onClick={() => handleEditQuantityChange(item.productId, item.quantity - 1)}
+                              data-testid={`button-edit-qty-minus-${item.productId}`}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={item.quantity}
+                              onChange={(e) => handleEditQuantityChange(item.productId, parseInt(e.target.value) || 1)}
+                              className="w-16 text-center h-7"
+                              data-testid={`input-edit-qty-${item.productId}`}
+                            />
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-7 w-7"
+                              onClick={() => handleEditQuantityChange(item.productId, item.quantity + 1)}
+                              data-testid={`button-edit-qty-plus-${item.productId}`}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">{item.unitPrice.toFixed(2)} LYD</TableCell>
+                        <TableCell className="text-center font-semibold">{(item.quantity * item.unitPrice).toFixed(2)} LYD</TableCell>
+                        <TableCell>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-red-500 hover:text-red-700"
+                            onClick={() => handleEditRemoveItem(item.productId)}
+                            data-testid={`button-edit-remove-${item.productId}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {editItems.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                          {t("noItems")}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <div className="relative" ref={editSearchRef}>
+              <Label>{t("addProduct")}</Label>
+              <div className="relative mt-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={editProductSearch}
+                  onChange={(e) => { setEditProductSearch(e.target.value); setShowEditProductResults(true); }}
+                  onFocus={() => { if (editProductSearch.length >= 1) setShowEditProductResults(true); }}
+                  placeholder={t("searchProducts")}
+                  className="pl-9"
+                  data-testid="input-edit-add-product"
+                />
+              </div>
+              {showEditProductResults && editSearchDebounced.length >= 1 && editSearchResults.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {editSearchResults
+                    .filter(p => !editItems.find(i => i.productId === p.id))
+                    .map(product => {
+                      const branchInv = product.inventory?.find(inv => inv.branch === editBranch);
+                      const stock = branchInv?.quantity || 0;
+                      return (
+                        <button
+                          key={product.id}
+                          className="w-full text-left px-3 py-2 hover:bg-accent flex items-center justify-between text-sm"
+                          onClick={() => handleEditAddProduct(product)}
+                          data-testid={`button-edit-add-${product.id}`}
+                        >
+                          <span className="font-medium">{product.name}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {Number(product.price).toFixed(2)} LYD | {t("stock")}: {stock}
+                          </span>
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center pt-2 border-t">
+              <div className="text-sm text-muted-foreground">
+                {editItems.length} {t("items")} | {selectedInvoice && (
+                  <span className={editTotal !== Number(selectedInvoice.totalAmount) ? "text-amber-600 font-medium" : ""}>
+                    {editTotal !== Number(selectedInvoice.totalAmount) && (
+                      <span className="line-through mr-1">{Number(selectedInvoice.totalAmount).toFixed(2)}</span>
+                    )}
+                  </span>
+                )}
+              </div>
+              <span className="text-xl font-bold">{editTotal.toFixed(2)} LYD</span>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} data-testid="button-cancel-edit">
               {t("cancel")}
             </Button>
-            <Button onClick={handleEditSave} disabled={editMutation.isPending || !editCustomerName.trim()} data-testid="button-save-edit">
-              {editMutation.isPending ? t("loading") : t("save")}
+            <Button onClick={handleEditSave} disabled={editMutation.isPending || !editCustomerName.trim() || editItems.length === 0} data-testid="button-save-edit">
+              {editMutation.isPending ? t("loading") : t("saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
