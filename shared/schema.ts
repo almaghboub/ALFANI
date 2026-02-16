@@ -264,7 +264,7 @@ export const invoiceItems = pgTable("invoice_items", {
 });
 
 // Stock Purchases (tracks every stock-in with financial impact)
-export const purchaseTypeEnum = pgEnum("purchase_type", ["paid_now", "on_credit"]);
+export const purchaseTypeEnum = pgEnum("purchase_type", ["paid_now", "on_credit", "initial_stock"]);
 
 export const stockPurchases = pgTable("stock_purchases", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

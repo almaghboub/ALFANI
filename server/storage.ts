@@ -270,6 +270,8 @@ export interface IStorage {
     totalBankBalanceLYD: number;
     totalCustomerDebt: number;
     totalSupplierDebt: number;
+    goodsCapitalLYD: number;
+    goodsCapitalUSD: number;
     recentTransactions: Array<{ type: string; amount: number; date: Date }>;
   }>;
 
@@ -1889,6 +1891,8 @@ export class PostgreSQLStorage implements IStorage {
     totalBankBalanceLYD: number;
     totalCustomerDebt: number;
     totalSupplierDebt: number;
+    goodsCapitalLYD: number;
+    goodsCapitalUSD: number;
     recentTransactions: Array<{ type: string; amount: number; date: Date }>;
   }> {
     // Get safe totals
@@ -1912,6 +1916,11 @@ export class PostgreSQLStorage implements IStorage {
     const supplierDebtResult = await db.select({
       total: sql<number>`COALESCE(SUM(balance_owed::numeric), 0)`,
     }).from(suppliers);
+
+    // Get goods capital (total inventory value = sum of cost_price * quantity for all products)
+    const goodsCapitalResult = await db.select({
+      totalLYD: sql<number>`COALESCE(SUM(bi.quantity * p.cost_price::numeric), 0)`,
+    }).from(sql`${branchInventory} bi INNER JOIN ${products} p ON p.id = bi.product_id WHERE bi.quantity > 0`);
 
     // Get recent transactions from both safes and banks (last 10)
     const recentSafeTransactions = await db.select({
@@ -1947,6 +1956,8 @@ export class PostgreSQLStorage implements IStorage {
       totalBankBalanceLYD: Number(bankResults[0]?.totalLYD || 0),
       totalCustomerDebt: Number(customerDebtResult[0]?.total || 0),
       totalSupplierDebt: Number(supplierDebtResult[0]?.total || 0),
+      goodsCapitalLYD: Number(goodsCapitalResult[0]?.totalLYD || 0),
+      goodsCapitalUSD: 0,
       recentTransactions,
     };
   }
