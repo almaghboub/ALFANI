@@ -581,6 +581,10 @@ async function migrateProductsTable() {
       await pool.query(`ALTER TABLE sales_invoices ADD COLUMN discount_value DECIMAL(10,2) DEFAULT 0`);
       await pool.query(`ALTER TABLE sales_invoices ADD COLUMN discount_amount DECIMAL(10,2) DEFAULT 0`);
     }
+    if (!invColNames.includes('service_amount')) {
+      console.log("Migrating: adding service_amount column to sales_invoices...");
+      await pool.query(`ALTER TABLE sales_invoices ADD COLUMN service_amount DECIMAL(10,2) DEFAULT 0`);
+    }
 
     // Create invoice_items table if missing
     const invoiceItemsExists = await pool.query(`

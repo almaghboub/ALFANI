@@ -251,6 +251,7 @@ export const salesInvoices = pgTable("sales_invoices", {
   discountType: text("discount_type").default("amount"),
   discountValue: decimal("discount_value", { precision: 10, scale: 2 }).default("0"),
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
+  serviceAmount: decimal("service_amount", { precision: 10, scale: 2 }).default("0"),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   safeId: varchar("safe_id").references(() => safes.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),

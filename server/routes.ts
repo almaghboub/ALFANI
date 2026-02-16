@@ -2503,7 +2503,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/invoices", requireAuth, async (req, res) => {
     try {
-      const { customerName, branch, items, safeId, discountType, discountValue } = req.body;
+      const { customerName, branch, items, safeId, discountType, discountValue, serviceAmount } = req.body;
       
       if (!customerName || typeof customerName !== 'string' || customerName.trim() === '') {
         return res.status(400).json({ message: "Customer name is required" });
@@ -2557,7 +2557,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           discountAmt = Math.min(dValue, subtotal);
         }
       }
-      const totalAmount = Math.max(subtotal - discountAmt, 0);
+      const svcAmount = parseFloat(serviceAmount) || 0;
+      const totalAmount = Math.max(subtotal - discountAmt + svcAmount, 0);
       
       const invoiceData = {
         invoiceNumber,
@@ -2567,6 +2568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountType: dType,
         discountValue: String(dValue),
         discountAmount: String(discountAmt),
+        serviceAmount: String(svcAmount),
         totalAmount: String(totalAmount),
         safeId: safeId || null,
       };

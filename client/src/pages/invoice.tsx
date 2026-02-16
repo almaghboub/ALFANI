@@ -1,7 +1,7 @@
 import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Minus, Printer, Trash2, ShoppingCart } from "lucide-react";
+import { Plus, Minus, Printer, Trash2, ShoppingCart, Wrench } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,8 @@ export default function Invoice() {
   const [logoBase64, setLogoBase64] = useState<string>(logoPath);
   const [discountType, setDiscountType] = useState<"amount" | "percentage">("amount");
   const [discountValue, setDiscountValue] = useState<string>("");
+  const [includeService, setIncludeService] = useState(false);
+  const [serviceAmount, setServiceAmount] = useState<string>("");
 
   useEffect(() => {
     getLogoBase64(logoPath).then(setLogoBase64);
@@ -94,7 +96,7 @@ export default function Invoice() {
   }, [safes, selectedSafeId]);
 
   const createInvoiceMutation = useMutation({
-    mutationFn: async (data: { customerName: string; branch: string; items: CartItem[]; safeId: string | null; discountType: string; discountValue: string }) => {
+    mutationFn: async (data: { customerName: string; branch: string; items: CartItem[]; safeId: string | null; discountType: string; discountValue: string; serviceAmount: string }) => {
       const response = await apiRequest("POST", "/api/invoices", data);
       return response.json();
     },
@@ -109,6 +111,8 @@ export default function Invoice() {
       setCustomerName("");
       setDiscountType("amount");
       setDiscountValue("");
+      setIncludeService(false);
+      setServiceAmount("");
     },
     onError: () => {
       toast({ title: t("error"), description: t("failedCreateInvoice"), variant: "destructive" });
@@ -181,7 +185,9 @@ export default function Invoice() {
     return Math.min(dv, subtotal);
   };
 
-  const getTotal = () => Math.max(getSubtotal() - getDiscountAmount(), 0);
+  const getServiceAmount = () => includeService ? (parseFloat(serviceAmount) || 0) : 0;
+
+  const getTotal = () => Math.max(getSubtotal() - getDiscountAmount() + getServiceAmount(), 0);
 
   const handlePrint = () => {
     const isRtl = document.dir === 'rtl';
@@ -196,6 +202,7 @@ export default function Invoice() {
     });
     const subtotal = getSubtotal();
     const discountAmt = getDiscountAmount();
+    const svcAmount = getServiceAmount();
     const finalTotal = getTotal();
     const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
 
@@ -508,6 +515,11 @@ export default function Invoice() {
                     <span class="label">${t("discount")} ${discountType === 'percentage' ? `(${parseFloat(discountValue || '0')}%)` : ''}</span>
                     <span class="value">-${discountAmt.toFixed(2)} LYD</span>
                   </div>` : ''}
+                  ${svcAmount > 0 ? `
+                  <div class="totals-row subtotal" style="color: #0369a1;">
+                    <span class="label">${t("serviceFee") || "Service"}</span>
+                    <span class="value">+${svcAmount.toFixed(2)} LYD</span>
+                  </div>` : ''}
                   <div class="totals-row grand-total">
                     <span class="label">${t("total")}</span>
                     <span class="value">${finalTotal.toFixed(2)} LYD</span>
@@ -552,7 +564,7 @@ export default function Invoice() {
       toast({ title: t("error"), description: t("cartEmpty"), variant: "destructive" });
       return;
     }
-    createInvoiceMutation.mutate({ customerName, branch, items: cart, safeId: selectedSafeId || null, discountType, discountValue });
+    createInvoiceMutation.mutate({ customerName, branch, items: cart, safeId: selectedSafeId || null, discountType, discountValue, serviceAmount: includeService ? serviceAmount : "0" });
   };
 
   const filteredProducts = products.filter(product => product.isActive);
@@ -699,6 +711,42 @@ export default function Invoice() {
                 )}
               </div>
 
+              <div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={includeService ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setIncludeService(!includeService);
+                      if (includeService) setServiceAmount("");
+                    }}
+                    data-testid="button-toggle-service"
+                  >
+                    <Wrench className="h-4 w-4 mr-1" />
+                    {t("serviceFee") || "Service Fee"}
+                  </Button>
+                </div>
+                {includeService && (
+                  <div className="mt-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00 LYD"
+                      value={serviceAmount}
+                      onChange={(e) => setServiceAmount(e.target.value)}
+                      data-testid="input-service-amount"
+                    />
+                    {getServiceAmount() > 0 && (
+                      <p className="text-sm text-blue-600 mt-1" data-testid="text-service-preview">
+                        +{getServiceAmount().toFixed(2)} LYD {t("serviceAdded") || "service added"}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {cart.length > 0 ? (
                 <div className="border rounded-md">
                   <Table>
@@ -745,16 +793,24 @@ export default function Invoice() {
               )}
               
               <div className="space-y-2 pt-4 border-t">
-                {getDiscountAmount() > 0 && (
+                {(getDiscountAmount() > 0 || getServiceAmount() > 0) && (
                   <>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">{t("subtotal")}</span>
                       <span className="text-sm">{getSubtotal().toFixed(2)} LYD</span>
                     </div>
-                    <div className="flex justify-between items-center text-red-500">
-                      <span className="text-sm">{t("discount")} {discountType === "percentage" ? `(${discountValue}%)` : ""}</span>
-                      <span className="text-sm">-{getDiscountAmount().toFixed(2)} LYD</span>
-                    </div>
+                    {getDiscountAmount() > 0 && (
+                      <div className="flex justify-between items-center text-red-500">
+                        <span className="text-sm">{t("discount")} {discountType === "percentage" ? `(${discountValue}%)` : ""}</span>
+                        <span className="text-sm">-{getDiscountAmount().toFixed(2)} LYD</span>
+                      </div>
+                    )}
+                    {getServiceAmount() > 0 && (
+                      <div className="flex justify-between items-center text-blue-600">
+                        <span className="text-sm">{t("serviceFee") || "Service Fee"}</span>
+                        <span className="text-sm">+{getServiceAmount().toFixed(2)} LYD</span>
+                      </div>
+                    )}
                   </>
                 )}
                 <div className="flex justify-between items-center">
