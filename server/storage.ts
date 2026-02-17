@@ -296,7 +296,7 @@ export interface IStorage {
   getBranchInventory(productId: string): Promise<BranchInventory[]>;
   upsertBranchInventory(inventory: InsertBranchInventory): Promise<BranchInventory>;
   deleteBranchInventory(id: string): Promise<boolean>;
-  getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number }>;
+  getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number }>;
   
   // Sales Invoices
   getAllInvoices(): Promise<SalesInvoiceWithItems[]>;
@@ -2063,7 +2063,7 @@ export class PostgreSQLStorage implements IStorage {
     }));
   }
 
-  private _statsCache: { data: { total: number; active: number; lowStock: number; outOfStock: number } | null; timestamp: number } = { data: null, timestamp: 0 };
+  private _statsCache: { data: { total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number } | null; timestamp: number } = { data: null, timestamp: 0 };
   private _totalCountCache: { count: number; timestamp: number } = { count: 0, timestamp: 0 };
 
   invalidateProductCaches() {
@@ -2152,7 +2152,7 @@ export class PostgreSQLStorage implements IStorage {
     };
   }
 
-  async getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number }> {
+  async getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number }> {
     const now = Date.now();
     if (this._statsCache.data && now - this._statsCache.timestamp < 5000) {
       return this._statsCache.data;
@@ -2163,7 +2163,8 @@ export class PostgreSQLStorage implements IStorage {
         (SELECT COUNT(*) FROM products)::int AS total,
         (SELECT COUNT(*) FROM products WHERE is_active = true)::int AS active,
         COUNT(*) FILTER (WHERE COALESCE(inv.total_qty, 0) = 0)::int AS out_of_stock,
-        COUNT(*) FILTER (WHERE COALESCE(inv.total_qty, 0) > 0 AND COALESCE(inv.total_qty, 0) <= COALESCE(inv.min_threshold, 5))::int AS low_stock
+        COUNT(*) FILTER (WHERE COALESCE(inv.total_qty, 0) > 0 AND COALESCE(inv.total_qty, 0) <= COALESCE(inv.min_threshold, 5))::int AS low_stock,
+        (SELECT COALESCE(SUM(CAST(p2.price AS NUMERIC) * bi.quantity), 0) FROM products p2 JOIN branch_inventory bi ON bi.product_id = p2.id WHERE bi.quantity > 0 AND p2.price IS NOT NULL) AS total_selling_value
       FROM products p
       LEFT JOIN (
         SELECT product_id, SUM(quantity) AS total_qty, MIN(low_stock_threshold) AS min_threshold
@@ -2177,6 +2178,7 @@ export class PostgreSQLStorage implements IStorage {
       active: Number(row.active) || 0,
       lowStock: Number(row.low_stock) || 0,
       outOfStock: Number(row.out_of_stock) || 0,
+      totalSellingValue: Number(row.total_selling_value) || 0,
     };
     this._statsCache = { data: stats, timestamp: now };
     return stats;

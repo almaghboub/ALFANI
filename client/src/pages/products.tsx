@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Pencil, Trash2, Package, PackagePlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Package, PackagePlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,6 +122,11 @@ export default function Products() {
   const { data: suppliersList = [] } = useQuery<any[]>({
     queryKey: ["/api/suppliers"],
     enabled: canManage,
+  });
+
+  const { data: productStats } = useQuery<{ total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number }>({
+    queryKey: ["/api/products/stats"],
+    staleTime: 10000,
   });
 
   const [suggestionSearch, setSuggestionSearch] = useState("");
@@ -379,6 +384,24 @@ export default function Products() {
           </Button>
         )}
       </div>
+
+      {user?.role === "owner" && productStats && (
+        <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("totalSellingPrice") || "Total Selling Price"}</p>
+                <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400" data-testid="text-total-selling-value">
+                  {productStats.totalSellingValue.toFixed(2)} LYD
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
