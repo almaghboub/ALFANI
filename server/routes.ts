@@ -2438,7 +2438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Sales Invoices
-  app.get("/api/invoices", requireAuth, async (req, res) => {
+  app.get("/api/invoices", requireOwner, async (req, res) => {
     try {
       const invoices = await storage.getAllInvoices();
       res.json(invoices);
@@ -2447,7 +2447,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/invoices/metrics", requireAuth, async (req, res) => {
+  app.get("/api/invoices/metrics", requireOwner, async (req, res) => {
     try {
       const branch = req.query.branch as string | undefined;
       const invoices = await storage.getAllInvoices();
@@ -2489,7 +2489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/invoices/:id", requireAuth, async (req, res) => {
+  app.get("/api/invoices/:id", requireOwner, async (req, res) => {
     try {
       const invoice = await storage.getInvoice(req.params.id);
       if (!invoice) {

@@ -104,7 +104,7 @@ export default function Dashboard() {
     });
   }
 
-  const metricCards = [
+  const allMetricCards = [
     {
       id: "total-sales",
       label: t('totalSales') || "Total Sales",
@@ -116,6 +116,7 @@ export default function Dashboard() {
       iconBg: "bg-emerald-500/10",
       iconColor: "text-emerald-600 dark:text-emerald-400",
       valueColor: "text-emerald-700 dark:text-emerald-400",
+      ownerOnly: true,
     },
     {
       id: "total-invoices",
@@ -128,6 +129,7 @@ export default function Dashboard() {
       iconBg: "bg-blue-500/10",
       iconColor: "text-blue-600 dark:text-blue-400",
       valueColor: "text-blue-700 dark:text-blue-400",
+      ownerOnly: true,
     },
     {
       id: "total-products",
@@ -140,6 +142,7 @@ export default function Dashboard() {
       iconBg: "bg-violet-500/10",
       iconColor: "text-violet-600 dark:text-violet-400",
       valueColor: "text-violet-700 dark:text-violet-400",
+      ownerOnly: false,
     },
     {
       id: "items-sold",
@@ -152,8 +155,10 @@ export default function Dashboard() {
       iconBg: "bg-amber-500/10",
       iconColor: "text-amber-600 dark:text-amber-400",
       valueColor: "text-amber-700 dark:text-amber-400",
+      ownerOnly: true,
     },
   ];
+  const metricCards = allMetricCards.filter(card => !card.ownerOnly || isOwner);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen" dir={isRTL ? "rtl" : "ltr"}>
@@ -312,6 +317,7 @@ export default function Dashboard() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {isOwner && (
           <Card className="border-border/50 animate-fade-in" data-testid="card-sales-chart">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-semibold">{t('salesTrend') || "Sales Trend"}</CardTitle>
@@ -340,6 +346,7 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {(lowStockCount > 0 || outOfStockCount > 0) ? (
             <Card className="border-border/50 animate-fade-in" data-testid="card-stock-alerts">
@@ -377,7 +384,7 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
-          ) : (
+          ) : isOwner ? (
             <Card className="border-border/50 animate-fade-in" data-testid="card-recent-invoices">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
@@ -422,7 +429,7 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          ) : null}
         </div>
 
         <Card className="border-border/50 animate-fade-in" data-testid="card-quick-actions">
