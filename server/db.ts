@@ -12,16 +12,17 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-const isProduction = process.env.NODE_ENV === "production";
+const dbUrl = process.env.DATABASE_URL || "";
+const isExternalDb = dbUrl.includes("render.com") || dbUrl.includes("neon.tech") || dbUrl.includes("supabase") || dbUrl.includes("amazonaws");
 
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: false } : undefined,
+  connectionString: dbUrl,
+  ssl: isExternalDb ? { rejectUnauthorized: false } : undefined,
   max: 20,
   min: 5,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  statement_timeout: 10000,
+  connectionTimeoutMillis: 10000,
+  statement_timeout: 15000,
 });
 export const db = drizzle(pool, { schema });
 
