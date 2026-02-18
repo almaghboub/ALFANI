@@ -11,7 +11,7 @@ import logoPath from "@assets/alfani-logo.png";
 const navigationItems = [
   { key: "dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"] },
   { key: "newInvoice", href: "/invoice", icon: Receipt, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
-  { key: "salesHistory", href: "/sales", icon: History, roles: ["owner"] },
+  { key: "salesHistory", href: "/sales", icon: History, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
   { key: "products", href: "/products", icon: Boxes, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
   { key: "inventory", href: "/inventory", icon: Warehouse, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
   { key: "finance", href: "/finance", icon: Wallet, roles: ["owner"] },

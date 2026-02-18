@@ -49,6 +49,8 @@ export default function Dashboard() {
   const isRTL = i18n.language === "ar";
   const isOwner = user?.role === 'owner';
 
+  const canAccessInvoices = ['owner', 'customer_service', 'receptionist', 'stock_manager'].includes(user?.role || '');
+
   const { data: invoiceMetrics, isLoading: metricsLoading } = useQuery<InvoiceMetrics>({
     queryKey: ["/api/invoices/metrics"],
     queryFn: async () => {
@@ -56,7 +58,7 @@ export default function Dashboard() {
       if (!response.ok) return { totalSales: 0, totalItems: 0, invoiceCount: 0, avgOrderValue: 0, byBranch: {} };
       return response.json();
     },
-    enabled: isOwner,
+    enabled: canAccessInvoices,
   });
 
   const { data: financialSummary, isLoading: summaryLoading } = useQuery<FinancialSummary>({
@@ -71,7 +73,7 @@ export default function Dashboard() {
 
   const { data: invoices = [] } = useQuery<Invoice[]>({
     queryKey: ["/api/invoices"],
-    enabled: isOwner,
+    enabled: canAccessInvoices,
   });
 
   const { data: expenses = [] } = useQuery<any[]>({
@@ -120,6 +122,7 @@ export default function Dashboard() {
       iconColor: "text-emerald-600 dark:text-emerald-400",
       valueColor: "text-emerald-700 dark:text-emerald-400",
       ownerOnly: true,
+      invoiceRelated: true,
     },
     {
       id: "total-invoices",
@@ -133,6 +136,7 @@ export default function Dashboard() {
       iconColor: "text-blue-600 dark:text-blue-400",
       valueColor: "text-blue-700 dark:text-blue-400",
       ownerOnly: true,
+      invoiceRelated: true,
     },
     {
       id: "total-products",
@@ -146,6 +150,7 @@ export default function Dashboard() {
       iconColor: "text-violet-600 dark:text-violet-400",
       valueColor: "text-violet-700 dark:text-violet-400",
       ownerOnly: false,
+      invoiceRelated: false,
     },
     {
       id: "items-sold",
@@ -159,9 +164,10 @@ export default function Dashboard() {
       iconColor: "text-amber-600 dark:text-amber-400",
       valueColor: "text-amber-700 dark:text-amber-400",
       ownerOnly: true,
+      invoiceRelated: true,
     },
   ];
-  const metricCards = allMetricCards.filter(card => !card.ownerOnly || isOwner);
+  const metricCards = allMetricCards.filter(card => !card.ownerOnly || (card.invoiceRelated ? canAccessInvoices : isOwner));
 
   return (
     <div className="flex-1 flex flex-col min-h-screen" dir={isRTL ? "rtl" : "ltr"}>
@@ -263,7 +269,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {isOwner && invoiceMetrics?.byBranch && (
+        {canAccessInvoices && invoiceMetrics?.byBranch && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
             <Card className="card-hover border-border/50 overflow-hidden relative" data-testid="card-branch-alfani1">
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-blue-600" />
@@ -320,7 +326,7 @@ export default function Dashboard() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {isOwner && (
+          {canAccessInvoices && (
           <Card className="border-border/50 animate-fade-in" data-testid="card-sales-chart">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-semibold">{t('salesTrend') || "Sales Trend"}</CardTitle>
@@ -387,7 +393,7 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
-          ) : isOwner ? (
+          ) : canAccessInvoices ? (
             <Card className="border-border/50 animate-fade-in" data-testid="card-recent-invoices">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
@@ -440,7 +446,7 @@ export default function Dashboard() {
             <CardTitle className="text-base font-semibold">{t('quickActions') || "Quick Actions"}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`grid grid-cols-2 ${isOwner ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3`}>
+            <div className={`grid grid-cols-2 ${canAccessInvoices ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3`}>
               <Button
                 className="h-auto py-5 flex-col gap-2 bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 shadow-md shadow-amber-500/20 transition-all duration-200"
                 data-testid="button-new-invoice"

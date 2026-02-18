@@ -585,6 +585,10 @@ async function migrateProductsTable() {
       console.log("Migrating: adding service_amount column to sales_invoices...");
       await pool.query(`ALTER TABLE sales_invoices ADD COLUMN service_amount DECIMAL(10,2) DEFAULT 0`);
     }
+    if (!invColNames.includes('created_by_user_id')) {
+      console.log("Migrating: adding created_by_user_id column to sales_invoices...");
+      await pool.query(`ALTER TABLE sales_invoices ADD COLUMN created_by_user_id VARCHAR`);
+    }
 
     // Create invoice_items table if missing
     const invoiceItemsExists = await pool.query(`

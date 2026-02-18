@@ -2438,23 +2438,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Sales Invoices
-  app.get("/api/invoices", requireOwner, async (req, res) => {
+  app.get("/api/invoices", requireAuth, async (req, res) => {
     try {
-      const invoices = await storage.getAllInvoices();
+      const user = req.user as any;
+      const allInvoices = await storage.getAllInvoices();
+      const invoices = user.role === 'owner' 
+        ? allInvoices 
+        : allInvoices.filter(inv => inv.createdByUserId === user.id);
       res.json(invoices);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch invoices" });
     }
   });
 
-  app.get("/api/invoices/metrics", requireOwner, async (req, res) => {
+  app.get("/api/invoices/metrics", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
       const branch = req.query.branch as string | undefined;
-      const invoices = await storage.getAllInvoices();
+      const allInvoices = await storage.getAllInvoices();
+      
+      const userInvoices = user.role === 'owner'
+        ? allInvoices
+        : allInvoices.filter(inv => inv.createdByUserId === user.id);
       
       const filteredInvoices = branch && branch !== 'all' 
-        ? invoices.filter(inv => inv.branch === branch)
-        : invoices;
+        ? userInvoices.filter(inv => inv.branch === branch)
+        : userInvoices;
       
       const totalSales = filteredInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
       const totalItems = filteredInvoices.reduce((sum, inv) => 
@@ -2464,15 +2473,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const byBranch = {
         ALFANI1: {
-          sales: invoices.filter(i => i.branch === 'ALFANI1').reduce((s, i) => s + Number(i.totalAmount), 0),
-          count: invoices.filter(i => i.branch === 'ALFANI1').length,
-          items: invoices.filter(i => i.branch === 'ALFANI1').reduce((s, inv) => 
+          sales: userInvoices.filter(i => i.branch === 'ALFANI1').reduce((s, i) => s + Number(i.totalAmount), 0),
+          count: userInvoices.filter(i => i.branch === 'ALFANI1').length,
+          items: userInvoices.filter(i => i.branch === 'ALFANI1').reduce((s, inv) => 
             s + inv.items.reduce((is, item) => is + item.quantity, 0), 0),
         },
         ALFANI2: {
-          sales: invoices.filter(i => i.branch === 'ALFANI2').reduce((s, i) => s + Number(i.totalAmount), 0),
-          count: invoices.filter(i => i.branch === 'ALFANI2').length,
-          items: invoices.filter(i => i.branch === 'ALFANI2').reduce((s, inv) => 
+          sales: userInvoices.filter(i => i.branch === 'ALFANI2').reduce((s, i) => s + Number(i.totalAmount), 0),
+          count: userInvoices.filter(i => i.branch === 'ALFANI2').length,
+          items: userInvoices.filter(i => i.branch === 'ALFANI2').reduce((s, inv) => 
             s + inv.items.reduce((is, item) => is + item.quantity, 0), 0),
         },
       };
@@ -2489,11 +2498,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/invoices/:id", requireOwner, async (req, res) => {
+  app.get("/api/invoices/:id", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
       const invoice = await storage.getInvoice(req.params.id);
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
+      }
+      if (user.role !== 'owner' && invoice.createdByUserId !== user.id) {
+        return res.status(403).json({ message: "Not authorized to view this invoice" });
       }
       res.json(invoice);
     } catch (error) {
@@ -2560,6 +2573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const svcAmount = parseFloat(serviceAmount) || 0;
       const totalAmount = Math.max(subtotal - discountAmt + svcAmount, 0);
       
+      const userId = (req.user as any)?.id || null;
       const invoiceData = {
         invoiceNumber,
         customerName: customerName.trim(),
@@ -2571,12 +2585,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         serviceAmount: String(svcAmount),
         totalAmount: String(totalAmount),
         safeId: safeId || null,
+        createdByUserId: userId,
       };
       
       const invoice = await storage.createInvoice(invoiceData, itemsData);
       
       if (safeId) {
-        const userId = (req.user as any)?.id || 'system';
         await storage.createSafeTransaction({
           safeId,
           type: 'deposit',
@@ -2585,7 +2599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: `Sale: ${invoiceNumber} - ${customerName.trim()}`,
           referenceType: 'invoice',
           referenceId: invoice.id,
-          createdByUserId: userId,
+          createdByUserId: userId || 'system',
         });
       }
       
@@ -2600,10 +2614,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { customerName, branch, items } = req.body;
+      const user = req.user as any;
 
       const existingInvoice = await storage.getInvoice(id);
       if (!existingInvoice) {
         return res.status(404).json({ message: "Invoice not found" });
+      }
+      if (user.role !== 'owner' && existingInvoice.createdByUserId !== user.id) {
+        return res.status(403).json({ message: "Not authorized to edit this invoice" });
       }
 
       const invoiceData: any = {};
@@ -2677,9 +2695,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/invoices/:id", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
       const existingInvoice = await storage.getInvoice(req.params.id);
       if (!existingInvoice) {
         return res.status(404).json({ message: "Invoice not found" });
+      }
+      if (user.role !== 'owner' && existingInvoice.createdByUserId !== user.id) {
+        return res.status(403).json({ message: "Not authorized to delete this invoice" });
       }
       
       const success = await storage.deleteInvoice(req.params.id);
@@ -2723,9 +2745,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      const user = req.user as any;
       const existingInvoice = await storage.getInvoice(id);
       if (!existingInvoice) {
         return res.status(404).json({ message: "Invoice not found" });
+      }
+      if (user.role !== 'owner' && existingInvoice.createdByUserId !== user.id) {
+        return res.status(403).json({ message: "Not authorized to return items from this invoice" });
       }
 
       for (const ret of returnItems) {

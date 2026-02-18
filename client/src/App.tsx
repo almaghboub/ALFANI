@@ -135,7 +135,7 @@ function Router() {
       </Route>
 
       <Route path="/sales">
-        <RoleProtectedRoute allowedRoles={["owner"]}>
+        <RoleProtectedRoute allowedRoles={["owner", "customer_service", "receptionist", "stock_manager"]}>
           <Sales />
         </RoleProtectedRoute>
       </Route>
