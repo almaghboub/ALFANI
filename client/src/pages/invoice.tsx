@@ -97,8 +97,17 @@ export default function Invoice() {
 
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: { customerName: string; branch: string; items: CartItem[]; safeId: string | null; discountType: string; discountValue: string; serviceAmount: string }) => {
-      const response = await apiRequest("POST", "/api/invoices", data);
-      return response.json();
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.message || `Error ${res.status}`);
+      }
+      return json;
     },
     onSuccess: (data) => {
       try {
@@ -119,11 +128,7 @@ export default function Invoice() {
       queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"], refetchType: "all" });
     },
     onError: (error: any) => {
-      let msg = t("failedCreateInvoice");
-      try {
-        const parsed = JSON.parse(error?.message?.replace(/^\d+:\s*/, "") || "{}");
-        if (parsed.message) msg = parsed.message;
-      } catch {}
+      const msg = error?.message || t("failedCreateInvoice");
       toast({ title: t("error"), description: msg, variant: "destructive" });
     },
   });
