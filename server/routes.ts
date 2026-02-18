@@ -2531,16 +2531,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       for (const item of items) {
-        if (!item.productId || !item.productName || typeof item.quantity !== 'number' || item.quantity <= 0) {
-          return res.status(400).json({ message: "Invalid item data" });
+        if (!item.productId || !item.productName) {
+          return res.status(400).json({ message: "Invalid item data: missing product info" });
         }
-        if (typeof item.unitPrice !== 'number' || item.unitPrice < 0) {
+        const qty = Number(item.quantity);
+        if (isNaN(qty) || qty <= 0) {
+          return res.status(400).json({ message: "Invalid item data: quantity must be positive" });
+        }
+        item.quantity = qty;
+        const price = Number(item.unitPrice);
+        if (isNaN(price) || price < 0) {
           return res.status(400).json({ message: "Invalid unit price" });
         }
+        item.unitPrice = price;
       }
       
       const stockCheck = await storage.checkInvoiceStock(branch, items);
       if (!stockCheck.success) {
+        console.error("Invoice stock check failed:", stockCheck.message, "Branch:", branch, "Items:", JSON.stringify(items.map((i: any) => ({ id: i.productId, name: i.productName, qty: i.quantity }))));
         return res.status(400).json({ message: stockCheck.message });
       }
       
