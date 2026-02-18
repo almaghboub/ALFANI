@@ -53,8 +53,10 @@ export default function Dashboard() {
     queryKey: ["/api/invoices/metrics"],
     queryFn: async () => {
       const response = await fetch("/api/invoices/metrics?branch=all", { credentials: 'include' });
+      if (!response.ok) return { totalSales: 0, totalItems: 0, invoiceCount: 0, avgOrderValue: 0, byBranch: {} };
       return response.json();
     },
+    enabled: isOwner,
   });
 
   const { data: financialSummary, isLoading: summaryLoading } = useQuery<FinancialSummary>({
@@ -69,6 +71,7 @@ export default function Dashboard() {
 
   const { data: invoices = [] } = useQuery<Invoice[]>({
     queryKey: ["/api/invoices"],
+    enabled: isOwner,
   });
 
   const { data: expenses = [] } = useQuery<any[]>({
