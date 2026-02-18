@@ -262,7 +262,7 @@ export const salesInvoices = pgTable("sales_invoices", {
 export const invoiceItems = pgTable("invoice_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   invoiceId: varchar("invoice_id").notNull().references(() => salesInvoices.id, { onDelete: "cascade" }),
-  productId: varchar("product_id").notNull().references(() => products.id),
+  productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   productName: text("product_name").notNull(),
   quantity: integer("quantity").notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
