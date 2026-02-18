@@ -114,8 +114,13 @@ export default function Invoice() {
       setIncludeService(false);
       setServiceAmount("");
     },
-    onError: () => {
-      toast({ title: t("error"), description: t("failedCreateInvoice"), variant: "destructive" });
+    onError: (error: any) => {
+      let msg = t("failedCreateInvoice");
+      try {
+        const parsed = JSON.parse(error?.message?.replace(/^\d+:\s*/, "") || "{}");
+        if (parsed.message) msg = parsed.message;
+      } catch {}
+      toast({ title: t("error"), description: msg, variant: "destructive" });
     },
   });
 
