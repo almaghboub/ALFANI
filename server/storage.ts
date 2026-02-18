@@ -301,7 +301,7 @@ export interface IStorage {
   // Sales Invoices
   getAllInvoices(): Promise<SalesInvoiceWithItems[]>;
   getInvoice(id: string): Promise<SalesInvoiceWithItems | undefined>;
-  createInvoice(invoice: InsertSalesInvoice, items: InsertInvoiceItem[]): Promise<SalesInvoiceWithItems>;
+  createInvoice(invoice: InsertSalesInvoice, items: InsertInvoiceItem[], itemBranches?: string[]): Promise<SalesInvoiceWithItems>;
   updateInvoice(id: string, invoice: Partial<InsertSalesInvoice>, items?: InsertInvoiceItem[]): Promise<SalesInvoiceWithItems | undefined>;
   deleteInvoice(id: string): Promise<boolean>;
   returnInvoiceItems(invoiceId: string, returnItems: Array<{itemId: string; quantity: number}>): Promise<SalesInvoiceWithItems | undefined>;
@@ -2240,7 +2240,7 @@ export class PostgreSQLStorage implements IStorage {
     return { ...invoiceResult[0], items };
   }
 
-  async createInvoice(invoice: InsertSalesInvoice, items: InsertInvoiceItem[]): Promise<SalesInvoiceWithItems> {
+  async createInvoice(invoice: InsertSalesInvoice, items: InsertInvoiceItem[], itemBranches?: string[]): Promise<SalesInvoiceWithItems> {
     const invoiceResult = await db.insert(salesInvoices).values(invoice).returning();
     const createdInvoice = invoiceResult[0];
     
@@ -2251,12 +2251,13 @@ export class PostgreSQLStorage implements IStorage {
     
     const createdItems = await db.insert(invoiceItems).values(itemsWithInvoiceId).returning();
     
-    for (const item of items) {
+    for (let i = 0; i < items.length; i++) {
+      const itemBranch = itemBranches?.[i] || invoice.branch;
       const inv = await db.select().from(branchInventory)
-        .where(sql`${branchInventory.productId} = ${item.productId} AND ${branchInventory.branch} = ${invoice.branch}`);
+        .where(sql`${branchInventory.productId} = ${items[i].productId} AND ${branchInventory.branch} = ${itemBranch}`);
       
       if (inv.length > 0) {
-        const newQty = Math.max(0, inv[0].quantity - item.quantity);
+        const newQty = Math.max(0, inv[0].quantity - items[i].quantity);
         await db.update(branchInventory)
           .set({ quantity: newQty, updatedAt: new Date() })
           .where(eq(branchInventory.id, inv[0].id));
@@ -2391,12 +2392,16 @@ export class PostgreSQLStorage implements IStorage {
         .where(sql`${branchInventory.productId} = ${item.productId} AND ${branchInventory.branch} = ${branch}`);
       
       if (inv.length === 0) {
-        await db.insert(branchInventory).values({
-          productId: item.productId,
-          branch: branch as any,
-          quantity: 0,
-          lowStockThreshold: 5,
-        }).onConflictDoNothing();
+        try {
+          await db.insert(branchInventory).values({
+            productId: item.productId,
+            branch: branch as any,
+            quantity: 0,
+            lowStockThreshold: 5,
+          }).onConflictDoNothing();
+        } catch (e) {
+          // FK constraint failure means product doesn't exist
+        }
         return { success: false, message: `Product has 0 stock in ${branch}. Please add stock first.` };
       }
       

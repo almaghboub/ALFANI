@@ -41,6 +41,7 @@ interface CartItem {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  branch: string;
 }
 
 export default function Invoice() {
@@ -134,10 +135,10 @@ export default function Invoice() {
   });
 
   const addToCart = (product: ProductWithInventory) => {
-    const branchInventory = product.inventory.find(inv => inv.branch === branch);
-    const availableQty = branchInventory?.quantity || 0;
+    const branchInv = product.inventory.find(inv => inv.branch === branch);
+    const availableQty = branchInv?.quantity || 0;
     
-    const existingItem = cart.find(item => item.productId === product.id);
+    const existingItem = cart.find(item => item.productId === product.id && item.branch === branch);
     const currentQty = existingItem?.quantity || 0;
     
     if (currentQty >= availableQty) {
@@ -147,7 +148,7 @@ export default function Invoice() {
 
     if (existingItem) {
       setCart(cart.map(item => 
-        item.productId === product.id 
+        (item.productId === product.id && item.branch === branch)
           ? { ...item, quantity: item.quantity + 1, lineTotal: (item.quantity + 1) * item.unitPrice }
           : item
       ));
@@ -158,17 +159,18 @@ export default function Invoice() {
         quantity: 1,
         unitPrice: Number(product.price || 0),
         lineTotal: Number(product.price || 0),
+        branch: branch,
       }]);
     }
   };
 
-  const updateQuantity = (productId: string, newQuantity: number) => {
+  const updateQuantity = (productId: string, itemBranch: string, newQuantity: number) => {
     if (newQuantity <= 0) {
-      setCart(cart.filter(item => item.productId !== productId));
+      setCart(cart.filter(item => !(item.productId === productId && item.branch === itemBranch)));
     } else {
       const product = products.find(p => p.id === productId);
-      const branchInventory = product?.inventory.find(inv => inv.branch === branch);
-      const availableQty = branchInventory?.quantity || 0;
+      const branchInv = product?.inventory.find(inv => inv.branch === itemBranch);
+      const availableQty = branchInv?.quantity || 0;
       
       if (newQuantity > availableQty) {
         toast({ title: t("error"), description: t("notEnoughStock"), variant: "destructive" });
@@ -176,15 +178,15 @@ export default function Invoice() {
       }
       
       setCart(cart.map(item =>
-        item.productId === productId
+        (item.productId === productId && item.branch === itemBranch)
           ? { ...item, quantity: newQuantity, lineTotal: newQuantity * item.unitPrice }
           : item
       ));
     }
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(cart.filter(item => item.productId !== productId));
+  const removeFromCart = (productId: string, itemBranch: string) => {
+    setCart(cart.filter(item => !(item.productId === productId && item.branch === itemBranch)));
   };
 
   const getSubtotal = () => cart.reduce((sum, item) => sum + item.lineTotal, 0);
@@ -514,7 +516,7 @@ export default function Invoice() {
                   ${cart.map((item, idx) => `
                     <tr>
                       <td class="num">${String(idx + 1).padStart(2, '0')}</td>
-                      <td class="name">${item.productName}</td>
+                      <td class="name">${item.productName} <small style="color:#64748b">(${item.branch})</small></td>
                       <td class="qty">${item.quantity}</td>
                       <td class="price">${item.unitPrice.toFixed(2)} <small style="color:#94a3b8">LYD</small></td>
                       <td class="total">${item.lineTotal.toFixed(2)} <small style="color:#94a3b8">LYD</small></td>
@@ -598,7 +600,8 @@ export default function Invoice() {
       toast({ title: t("error"), description: t("cartEmpty"), variant: "destructive" });
       return;
     }
-    createInvoiceMutation.mutate({ customerName, branch, items: cart, safeId: selectedSafeId || null, discountType, discountValue, serviceAmount: includeService ? serviceAmount : "0" });
+    const invoiceBranch = cart[0]?.branch || branch;
+    createInvoiceMutation.mutate({ customerName, branch: invoiceBranch, items: cart, safeId: selectedSafeId || null, discountType, discountValue, serviceAmount: includeService ? serviceAmount : "0" });
   };
 
   const filteredProducts = products.filter(product => product.isActive);
@@ -787,6 +790,7 @@ export default function Invoice() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>{t("product")}</TableHead>
+                        <TableHead>{t("branch")}</TableHead>
                         <TableHead>{t("quantity")}</TableHead>
                         <TableHead>{t("price")}</TableHead>
                         <TableHead>{t("total")}</TableHead>
@@ -795,15 +799,16 @@ export default function Invoice() {
                     </TableHeader>
                     <TableBody>
                       {cart.map(item => (
-                        <TableRow key={item.productId}>
+                        <TableRow key={`${item.productId}-${item.branch}`}>
                           <TableCell>{item.productName}</TableCell>
+                          <TableCell><span className="inline-block px-2 py-0.5 text-xs font-medium rounded bg-muted">{item.branch}</span></TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <Button size="icon" variant="outline" onClick={() => updateQuantity(item.productId, item.quantity - 1)}>
+                              <Button size="icon" variant="outline" onClick={() => updateQuantity(item.productId, item.branch, item.quantity - 1)}>
                                 <Minus className="h-3 w-3" />
                               </Button>
                               <span>{item.quantity}</span>
-                              <Button size="icon" variant="outline" onClick={() => updateQuantity(item.productId, item.quantity + 1)}>
+                              <Button size="icon" variant="outline" onClick={() => updateQuantity(item.productId, item.branch, item.quantity + 1)}>
                                 <Plus className="h-3 w-3" />
                               </Button>
                             </div>
@@ -811,7 +816,7 @@ export default function Invoice() {
                           <TableCell>{item.unitPrice.toFixed(2)} LYD</TableCell>
                           <TableCell>{item.lineTotal.toFixed(2)} LYD</TableCell>
                           <TableCell>
-                            <Button size="icon" variant="ghost" onClick={() => removeFromCart(item.productId)}>
+                            <Button size="icon" variant="ghost" onClick={() => removeFromCart(item.productId, item.branch)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </TableCell>

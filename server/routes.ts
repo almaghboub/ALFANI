@@ -2546,10 +2546,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         item.unitPrice = price;
       }
       
-      const stockCheck = await storage.checkInvoiceStock(branch, items);
-      if (!stockCheck.success) {
-        console.error("Invoice stock check failed:", stockCheck.message, "Branch:", branch, "Items:", JSON.stringify(items.map((i: any) => ({ id: i.productId, name: i.productName, qty: i.quantity }))));
-        return res.status(400).json({ message: stockCheck.message });
+      for (const item of items) {
+        const itemBranch = item.branch || branch;
+        const stockCheck = await storage.checkInvoiceStock(itemBranch, [{ productId: item.productId, quantity: item.quantity }]);
+        if (!stockCheck.success) {
+          return res.status(400).json({ message: `${item.productName}: ${stockCheck.message}` });
+        }
       }
       
       const invoiceNumber = await storage.generateInvoiceNumber();
@@ -2596,7 +2598,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdByUserId: userId,
       };
       
-      const invoice = await storage.createInvoice(invoiceData, itemsData);
+      const itemBranches = items.map((item: any) => item.branch || branch);
+      const invoice = await storage.createInvoice(invoiceData, itemsData, itemBranches);
       
       if (safeId) {
         await storage.createSafeTransaction({
