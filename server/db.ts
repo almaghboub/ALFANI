@@ -610,6 +610,94 @@ async function migrateProductsTable() {
       `);
     }
 
+    // Create purchase_type enum if not exists
+    await pool.query(`
+      DO $$ BEGIN
+        CREATE TYPE purchase_type AS ENUM ('paid_now', 'on_credit', 'initial_stock');
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    // Create stock_purchases table if missing
+    const stockPurchasesExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'stock_purchases'
+    `);
+    if (stockPurchasesExists.rows.length === 0) {
+      console.log("Migrating: creating stock_purchases table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS stock_purchases (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          product_id VARCHAR NOT NULL REFERENCES products(id),
+          product_name TEXT NOT NULL,
+          branch branch NOT NULL,
+          quantity INTEGER NOT NULL,
+          cost_per_unit DECIMAL(10,2) NOT NULL,
+          total_cost DECIMAL(15,2) NOT NULL,
+          purchase_type purchase_type NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'LYD',
+          exchange_rate DECIMAL(10,4),
+          supplier_name TEXT,
+          supplier_invoice_number TEXT,
+          safe_id VARCHAR REFERENCES safes(id),
+          supplier_id VARCHAR REFERENCES suppliers(id),
+          safe_transaction_id VARCHAR REFERENCES safe_transactions(id),
+          created_by_user_id VARCHAR NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // Create suppliers table if missing
+    const suppliersExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'suppliers'
+    `);
+    if (suppliersExists.rows.length === 0) {
+      console.log("Migrating: creating suppliers table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS suppliers (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          phone TEXT,
+          email TEXT,
+          address TEXT,
+          balance_owed DECIMAL(15,2) NOT NULL DEFAULT 0,
+          currency TEXT NOT NULL DEFAULT 'USD',
+          notes TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // Create accounting_entries table if missing
+    const accountingExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'accounting_entries'
+    `);
+    if (accountingExists.rows.length === 0) {
+      console.log("Migrating: creating accounting_entries table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS accounting_entries (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          entry_number TEXT NOT NULL,
+          date TIMESTAMP NOT NULL DEFAULT NOW(),
+          description TEXT NOT NULL,
+          debit_account_type TEXT NOT NULL,
+          debit_account_id TEXT NOT NULL,
+          credit_account_type TEXT NOT NULL,
+          credit_account_id TEXT NOT NULL,
+          amount_usd DECIMAL(15,2) NOT NULL DEFAULT 0,
+          amount_lyd DECIMAL(15,2) NOT NULL DEFAULT 0,
+          exchange_rate DECIMAL(10,4),
+          reference_type TEXT,
+          reference_id VARCHAR,
+          created_by_user_id VARCHAR NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
     // Enable pg_trgm for fast text search on 100k+ products
     try {
       await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
