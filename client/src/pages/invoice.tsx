@@ -101,18 +101,22 @@ export default function Invoice() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
-      toast({ title: t("success"), description: t("invoiceCreated") });
-      handlePrint();
+      try {
+        handlePrint();
+      } catch (e) {
+        console.error("Print error:", e);
+      }
       setCart([]);
       setCustomerName("");
       setDiscountType("amount");
       setDiscountValue("");
       setIncludeService(false);
       setServiceAmount("");
+      toast({ title: t("success"), description: t("invoiceCreated") });
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/safes"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"], refetchType: "all" });
     },
     onError: (error: any) => {
       let msg = t("failedCreateInvoice");
@@ -211,9 +215,18 @@ export default function Invoice() {
     const finalTotal = getTotal();
     const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
 
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'fixed';
+    printFrame.style.top = '-10000px';
+    printFrame.style.left = '-10000px';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = 'none';
+    document.body.appendChild(printFrame);
+    const printDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
+    if (printDoc) {
+      printDoc.open();
+      printDoc.write(`
         <html dir="${dir}">
           <head>
             <meta charset="UTF-8">
@@ -555,8 +568,19 @@ export default function Invoice() {
           </body>
         </html>
       `);
-      printWindow.document.close();
-      setTimeout(() => printWindow.print(), 400);
+      printDoc.close();
+      setTimeout(() => {
+        try {
+          printFrame.contentWindow?.print();
+        } catch (e) {
+          console.error("Print failed:", e);
+        }
+        setTimeout(() => {
+          try { document.body.removeChild(printFrame); } catch {}
+        }, 2000);
+      }, 500);
+    } else {
+      try { document.body.removeChild(printFrame); } catch {}
     }
   };
 

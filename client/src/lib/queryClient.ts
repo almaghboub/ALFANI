@@ -3,7 +3,6 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     if (res.status === 401 && !res.url.includes("/api/auth/")) {
-      window.location.href = "/";
       throw new Error("Session expired");
     }
     const text = (await res.text()) || res.statusText;
@@ -33,7 +32,8 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = typeof queryKey[0] === 'string' ? queryKey[0] : String(queryKey[0]);
+    const res = await fetch(url, {
       credentials: "include",
     });
 
@@ -51,7 +51,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 30000,
       retry: false,
     },
     mutations: {
