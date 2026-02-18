@@ -2391,18 +2391,13 @@ export class PostgreSQLStorage implements IStorage {
         .where(sql`${branchInventory.productId} = ${item.productId} AND ${branchInventory.branch} = ${branch}`);
       
       if (inv.length === 0) {
-        const allInv = await db.select().from(branchInventory)
-          .where(sql`${branchInventory.productId} = ${item.productId}`);
-        if (allInv.length === 0) {
-          await db.insert(branchInventory).values({
-            productId: item.productId,
-            branch: branch as any,
-            quantity: 0,
-            lowStockThreshold: 5,
-          });
-          return { success: false, message: `Product has 0 stock in ${branch}. Please add stock first.` };
-        }
-        return { success: false, message: `Product not available in ${branch}. It exists in: ${allInv.map(i => i.branch).join(', ')}` };
+        await db.insert(branchInventory).values({
+          productId: item.productId,
+          branch: branch as any,
+          quantity: 0,
+          lowStockThreshold: 5,
+        }).onConflictDoNothing();
+        return { success: false, message: `Product has 0 stock in ${branch}. Please add stock first.` };
       }
       
       if (inv[0].quantity < item.quantity) {
