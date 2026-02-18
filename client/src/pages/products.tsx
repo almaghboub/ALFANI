@@ -90,7 +90,7 @@ export default function Products() {
       return res.json();
     },
     placeholderData: keepPreviousData,
-    staleTime: 10000,
+    staleTime: 3000,
   });
 
   useEffect(() => {
@@ -105,7 +105,7 @@ export default function Products() {
           if (!res.ok) throw new Error("Failed to fetch products");
           return res.json();
         },
-        staleTime: 10000,
+        staleTime: 3000,
       });
     }
   }, [currentPage, pageSize, debouncedSearch, paginatedData]);

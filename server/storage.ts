@@ -2037,15 +2037,22 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async searchProductsByName(query: string, maxResults: number = 10): Promise<ProductWithInventory[]> {
-    const searchTerm = `%${query.trim()}%`;
+    const searchWords = query.trim().split(/\s+/).filter(w => w.length > 0);
+    if (searchWords.length === 0) return [];
+    
+    const wordConditions = searchWords.map(word => {
+      const term = `%${word}%`;
+      return or(
+        ilike(products.name, term),
+        ilike(products.sku, term),
+        ilike(products.category, term)
+      );
+    });
+    
     const matchedProducts = await db
       .select()
       .from(products)
-      .where(or(
-        ilike(products.name, searchTerm),
-        ilike(products.sku, searchTerm),
-        ilike(products.category, searchTerm)
-      ))
+      .where(and(...wordConditions))
       .orderBy(desc(products.createdAt))
       .limit(maxResults);
 
@@ -2078,14 +2085,17 @@ export class PostgreSQLStorage implements IStorage {
 
     const conditions = [];
     if (search && search.trim()) {
-      const searchTerm = `%${search.trim()}%`;
-      conditions.push(
-        or(
-          ilike(products.name, searchTerm),
-          ilike(products.sku, searchTerm),
-          ilike(products.category, searchTerm)
-        )
-      );
+      const searchWords = search.trim().split(/\s+/).filter(w => w.length > 0);
+      for (const word of searchWords) {
+        const term = `%${word}%`;
+        conditions.push(
+          or(
+            ilike(products.name, term),
+            ilike(products.sku, term),
+            ilike(products.category, term)
+          )
+        );
+      }
     }
     if (category && category.trim()) {
       conditions.push(eq(products.category, category));

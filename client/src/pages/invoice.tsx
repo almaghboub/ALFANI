@@ -80,7 +80,7 @@ export default function Invoice() {
       return res.json();
     },
     placeholderData: keepPreviousData,
-    staleTime: 10000,
+    staleTime: 3000,
   });
 
   const products = productsData?.products || [];
