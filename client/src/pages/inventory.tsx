@@ -79,7 +79,7 @@ export default function Inventory() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
       setIsAddStockDialogOpen(false);
       setSelectedProduct(null);
       setStockFormData({ quantity: 0, lowStockThreshold: 5 });

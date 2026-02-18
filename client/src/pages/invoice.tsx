@@ -102,7 +102,7 @@ export default function Invoice() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
       toast({ title: t("success"), description: t("invoiceCreated") });

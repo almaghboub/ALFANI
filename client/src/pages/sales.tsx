@@ -112,7 +112,8 @@ export default function Sales() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
       setIsEditDialogOpen(false);
@@ -150,7 +151,7 @@ export default function Sales() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
       setIsReturnDialogOpen(false);

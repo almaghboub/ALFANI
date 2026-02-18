@@ -193,8 +193,8 @@ export default function Products() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
       setIsCreateDialogOpen(false);
       resetForm();
       toast({ title: t("success"), description: t("productCreated") });
@@ -220,8 +220,8 @@ export default function Products() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
       setIsEditDialogOpen(false);
       setSelectedProduct(null);
       resetForm();
@@ -237,8 +237,8 @@ export default function Products() {
       await apiRequest("DELETE", `/api/products/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
       setIsDeleteDialogOpen(false);
       setSelectedProduct(null);
       toast({ title: t("success"), description: t("productDeleted") });
@@ -254,8 +254,8 @@ export default function Products() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/safe-transactions"] });
