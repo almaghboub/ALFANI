@@ -1589,41 +1589,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const costPrice = parseFloat(product.costPrice || "0");
       if (qty > 0 && costPrice > 0) {
-        const totalCost = qty * costPrice;
+        try {
+          const totalCost = qty * costPrice;
 
-        const stockPurchase = await storage.createStockPurchase({
-          productId: product.id,
-          productName: product.name,
-          branch,
-          quantity: qty,
-          costPerUnit: String(costPrice),
-          totalCost: String(totalCost),
-          purchaseType: "initial_stock",
-          currency: "LYD",
-          exchangeRate: null,
-          supplierName: null,
-          supplierInvoiceNumber: null,
-          safeId: null,
-          supplierId: null,
-          safeTransactionId: null,
-          createdByUserId: req.user!.id,
-        });
+          const stockPurchase = await storage.createStockPurchase({
+            productId: product.id,
+            productName: product.name,
+            branch,
+            quantity: qty,
+            costPerUnit: String(costPrice),
+            totalCost: String(totalCost),
+            purchaseType: "initial_stock",
+            currency: "LYD",
+            exchangeRate: null,
+            supplierName: null,
+            supplierInvoiceNumber: null,
+            safeId: null,
+            supplierId: null,
+            safeTransactionId: null,
+            createdByUserId: req.user!.id,
+          });
 
-        await storage.createAccountingEntry({
-          entryNumber: `INIT-${Date.now()}`,
-          date: new Date(),
-          description: `Initial Stock: ${product.name} (${qty} × ${costPrice} LYD)`,
-          debitAccountType: "inventory",
-          debitAccountId: branch,
-          creditAccountType: "owner_equity",
-          creditAccountId: "goods_capital",
-          amountUSD: "0",
-          amountLYD: String(totalCost),
-          exchangeRate: null,
-          referenceType: "stock_purchase",
-          referenceId: stockPurchase.id,
-          createdByUserId: req.user!.id,
-        });
+          await storage.createAccountingEntry({
+            entryNumber: `INIT-${Date.now()}`,
+            date: new Date(),
+            description: `Initial Stock: ${product.name} (${qty} × ${costPrice} LYD)`,
+            debitAccountType: "inventory",
+            debitAccountId: branch,
+            creditAccountType: "owner_equity",
+            creditAccountId: "goods_capital",
+            amountUSD: "0",
+            amountLYD: String(totalCost),
+            exchangeRate: null,
+            referenceType: "stock_purchase",
+            referenceId: stockPurchase.id,
+            createdByUserId: req.user!.id,
+          });
+        } catch (stockErr: any) {
+          console.error("Stock purchase record failed (product still created):", stockErr?.message);
+        }
       }
       
       res.status(201).json(product);
