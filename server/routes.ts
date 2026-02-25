@@ -1580,17 +1580,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const product = await storage.createProduct(result.data);
       
-      await storage.upsertBranchInventory({
-        productId: product.id,
-        branch: branch,
-        quantity: qty,
-        lowStockThreshold: 5,
-      });
+      try {
+        await storage.upsertBranchInventory({
+          productId: product.id,
+          branch: branch,
+          quantity: qty,
+          lowStockThreshold: 5,
+        });
+      } catch (invErr: any) {
+        console.error("Branch inventory creation failed (product still created):", invErr?.message);
+      }
+
+      res.status(201).json(product);
 
       const costPrice = parseFloat(product.costPrice || "0");
       if (qty > 0 && costPrice > 0) {
         try {
           const totalCost = qty * costPrice;
+          const userId = (req.user as any)?.id || 'system';
 
           const stockPurchase = await storage.createStockPurchase({
             productId: product.id,
@@ -1607,7 +1614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             safeId: null,
             supplierId: null,
             safeTransactionId: null,
-            createdByUserId: req.user!.id,
+            createdByUserId: userId,
           });
 
           await storage.createAccountingEntry({
@@ -1623,14 +1630,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             exchangeRate: null,
             referenceType: "stock_purchase",
             referenceId: stockPurchase.id,
-            createdByUserId: req.user!.id,
+            createdByUserId: userId,
           });
         } catch (stockErr: any) {
           console.error("Stock purchase record failed (product still created):", stockErr?.message);
         }
       }
-      
-      res.status(201).json(product);
     } catch (error: any) {
       console.error("Failed to create product:", error?.stack || error?.message || error);
       res.status(500).json({ message: "Failed to create product: " + (error?.message || "Unknown error") });
