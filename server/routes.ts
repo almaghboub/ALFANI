@@ -2610,20 +2610,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemBranches = items.map((item: any) => item.branch || branch);
       const invoice = await storage.createInvoice(invoiceData, itemsData, itemBranches);
       
-      if (safeId) {
-        await storage.createSafeTransaction({
-          safeId,
-          type: 'deposit',
-          amountUSD: "0",
-          amountLYD: String(totalAmount),
-          description: `Sale: ${invoiceNumber} - ${customerName.trim()}`,
-          referenceType: 'invoice',
-          referenceId: invoice.id,
-          createdByUserId: userId || 'system',
-        });
-      }
-      
       res.status(201).json(invoice);
+
+      if (safeId) {
+        try {
+          await storage.createSafeTransaction({
+            safeId,
+            type: 'deposit',
+            amountUSD: "0",
+            amountLYD: String(totalAmount),
+            description: `Sale: ${invoiceNumber} - ${customerName.trim()}`,
+            referenceType: 'invoice',
+            referenceId: invoice.id,
+            createdByUserId: userId || 'system',
+          });
+        } catch (safeTxErr: any) {
+          console.error("Safe transaction failed (invoice still created):", safeTxErr?.message);
+        }
+      }
     } catch (error) {
       console.error("Failed to create invoice:", error);
       res.status(500).json({ message: "Failed to create invoice" });
