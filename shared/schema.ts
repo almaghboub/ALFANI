@@ -253,7 +253,21 @@ export const salesInvoices = pgTable("sales_invoices", {
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
   serviceAmount: decimal("service_amount", { precision: 10, scale: 2 }).default("0"),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  paymentStatus: text("payment_status").default("paid"),
+  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).default("0"),
+  remainingAmount: decimal("remaining_amount", { precision: 10, scale: 2 }).default("0"),
   safeId: varchar("safe_id").references(() => safes.id),
+  createdByUserId: varchar("created_by_user_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const creditPayments = pgTable("credit_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => salesInvoices.id),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method").default("cash"),
+  safeId: varchar("safe_id").references(() => safes.id),
+  description: text("description"),
   createdByUserId: varchar("created_by_user_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -681,6 +695,11 @@ export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({
   id: true,
 });
 
+export const insertCreditPaymentSchema = createInsertSchema(creditPayments).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Login schema
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -787,6 +806,9 @@ export type SalesInvoice = typeof salesInvoices.$inferSelect;
 
 export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
+
+export type InsertCreditPayment = z.infer<typeof insertCreditPaymentSchema>;
+export type CreditPayment = typeof creditPayments.$inferSelect;
 
 // Extended product type with inventory
 export type ProductWithInventory = Product & {

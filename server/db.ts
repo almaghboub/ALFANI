@@ -407,6 +407,9 @@ export async function initializeDatabase() {
         customer_name TEXT NOT NULL,
         branch branch NOT NULL,
         total_amount DECIMAL(10,2) NOT NULL,
+        payment_status TEXT DEFAULT 'paid',
+        paid_amount DECIMAL(10,2) DEFAULT 0,
+        remaining_amount DECIMAL(10,2) DEFAULT 0,
         safe_id VARCHAR REFERENCES safes(id),
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
@@ -692,6 +695,9 @@ async function migrateProductsTable() {
           discount_value DECIMAL(10,2) DEFAULT 0,
           discount_amount DECIMAL(10,2) DEFAULT 0,
           service_amount DECIMAL(10,2) DEFAULT 0,
+          payment_status TEXT DEFAULT 'paid',
+          paid_amount DECIMAL(10,2) DEFAULT 0,
+          remaining_amount DECIMAL(10,2) DEFAULT 0,
           safe_id VARCHAR REFERENCES safes(id),
           created_by_user_id VARCHAR,
           created_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -719,6 +725,38 @@ async function migrateProductsTable() {
         console.log("Migrating: adding created_by_user_id column to sales_invoices...");
         await pool.query(`ALTER TABLE sales_invoices ADD COLUMN created_by_user_id VARCHAR`);
       }
+      if (!invColNames.includes('payment_status')) {
+        console.log("Migrating: adding payment_status column to sales_invoices...");
+        await pool.query(`ALTER TABLE sales_invoices ADD COLUMN payment_status TEXT DEFAULT 'paid'`);
+      }
+      if (!invColNames.includes('paid_amount')) {
+        console.log("Migrating: adding paid_amount column to sales_invoices...");
+        await pool.query(`ALTER TABLE sales_invoices ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0`);
+      }
+      if (!invColNames.includes('remaining_amount')) {
+        console.log("Migrating: adding remaining_amount column to sales_invoices...");
+        await pool.query(`ALTER TABLE sales_invoices ADD COLUMN remaining_amount DECIMAL(10,2) DEFAULT 0`);
+      }
+    }
+
+    // Create credit_payments table if missing
+    const creditPaymentsExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'credit_payments'
+    `);
+    if (creditPaymentsExists.rows.length === 0) {
+      console.log("Migrating: creating credit_payments table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS credit_payments (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          invoice_id VARCHAR NOT NULL REFERENCES sales_invoices(id),
+          amount DECIMAL(10,2) NOT NULL,
+          payment_method TEXT DEFAULT 'cash',
+          safe_id VARCHAR REFERENCES safes(id),
+          description TEXT,
+          created_by_user_id VARCHAR,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
     }
 
     // Create invoice_items table if missing

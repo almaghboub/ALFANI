@@ -48,6 +48,19 @@ The system features comprehensive functionality with responsive interface, bilin
   - Backend: GET `/api/reports/performance?range=daily|weekly|monthly&country[]=...&dateFrom=...&dateTo=...`
   - Bilingual display (English/Arabic) with proper RTL layout
 
+- **Credit System - Customer Receivables & Supplier Payables (February 2026)**:
+  - Invoice payment type toggle: Cash (default) or Credit
+  - Credit invoices track `paymentStatus` (paid/unpaid/partially_paid), `paidAmount`, `remainingAmount`
+  - `credit_payments` table records partial payments against credit invoices
+  - Dedicated "Credits & Debts" page (`/credits`, owner-only) with:
+    - Summary cards: Total Receivables, Total Payables, counts
+    - Customer Receivables table with payment recording dialog
+    - Supplier Payables table with pay supplier dialog
+    - Payment history per invoice (expandable rows)
+    - Status badges: Unpaid (red), Partially Paid (amber), Paid (green)
+  - API routes: GET/POST `/api/credit/invoices`, `/api/credit/payments`, `/api/credit/summary`, `/api/credit/supplier-debts`, `/api/credit/supplier-payments`
+  - Full bilingual support (English/Arabic) with RTL layout
+
 - **Global Price Markup System (February 2026)**:
   - Owner-controlled global percentage markup to protect prices against exchange rate instability
   - Setting stored as `global_markup_percentage` in settings table

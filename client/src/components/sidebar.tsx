@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, TrendingUp, DollarSign, Users2, Settings, LogOut, Menu, Wallet, Boxes, Warehouse, Receipt, History } from "lucide-react";
+import { LayoutDashboard, TrendingUp, DollarSign, Users2, Settings, LogOut, Menu, Wallet, Boxes, Warehouse, Receipt, History, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/components/auth-provider";
@@ -17,6 +17,7 @@ const navigationItems = [
   { key: "finance", href: "/finance", icon: Wallet, roles: ["owner"] },
   { key: "profitReports", href: "/profits", icon: TrendingUp, roles: ["owner"] },
   { key: "expenses", href: "/expenses", icon: DollarSign, roles: ["owner"] },
+  { key: "creditsDebts", href: "/credits", icon: CreditCard, roles: ["owner"] },
   { key: "userManagement", href: "/users", icon: Users2, roles: ["owner"] },
   { key: "settings", href: "/settings", icon: Settings, roles: ["owner", "customer_service", "receptionist", "sorter", "stock_manager"] },
 ];

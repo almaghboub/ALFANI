@@ -59,6 +59,7 @@ export default function Invoice() {
   const [discountValue, setDiscountValue] = useState<string>("");
   const [includeService, setIncludeService] = useState(false);
   const [serviceAmount, setServiceAmount] = useState<string>("");
+  const [paymentType, setPaymentType] = useState<"cash" | "credit">("cash");
 
   useEffect(() => {
     getLogoBase64(logoPath).then(setLogoBase64);
@@ -116,7 +117,7 @@ export default function Invoice() {
   }, [safes, selectedSafeId]);
 
   const createInvoiceMutation = useMutation({
-    mutationFn: async (data: { customerName: string; branch: string; items: CartItem[]; safeId: string | null; discountType: string; discountValue: string; serviceAmount: string }) => {
+    mutationFn: async (data: { customerName: string; branch: string; items: CartItem[]; safeId: string | null; discountType: string; discountValue: string; serviceAmount: string; paymentType: string }) => {
       const res = await fetch("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -141,6 +142,7 @@ export default function Invoice() {
       setDiscountValue("");
       setIncludeService(false);
       setServiceAmount("");
+      setPaymentType("cash");
       toast({ title: t("success"), description: t("invoiceCreated") });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
@@ -621,7 +623,8 @@ export default function Invoice() {
       return;
     }
     const invoiceBranch = cart[0]?.branch || branch;
-    createInvoiceMutation.mutate({ customerName, branch: invoiceBranch, items: cart, safeId: selectedSafeId || null, discountType, discountValue, serviceAmount: includeService ? serviceAmount : "0" });
+    const effectiveSafeId = paymentType === "credit" ? null : (selectedSafeId || null);
+    createInvoiceMutation.mutate({ customerName, branch: invoiceBranch, items: cart, safeId: effectiveSafeId, discountType, discountValue, serviceAmount: includeService ? serviceAmount : "0", paymentType });
   };
 
   const filteredProducts = products.filter(product => product.isActive);
@@ -737,7 +740,31 @@ export default function Invoice() {
                   data-testid="input-customer-name"
                 />
               </div>
-              {safes.filter(s => s.isActive).length > 0 && (
+              <div>
+                <Label>{t("paymentType")}</Label>
+                <div className="flex gap-2 mt-1">
+                  <Button
+                    type="button"
+                    variant={paymentType === "cash" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setPaymentType("cash")}
+                    data-testid="button-payment-cash"
+                  >
+                    {t("cashSale")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={paymentType === "credit" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setPaymentType("credit")}
+                    data-testid="button-payment-credit"
+                  >
+                    {t("creditSale")}
+                  </Button>
+                </div>
+              </div>
+
+              {safes.filter(s => s.isActive).length > 0 && paymentType === "cash" && (
               <div>
                 <Label>{t("cashbox")}</Label>
                 <Select value={selectedSafeId} onValueChange={setSelectedSafeId}>

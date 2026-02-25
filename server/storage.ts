@@ -99,6 +99,9 @@ import {
   type StockPurchase,
   type InsertStockPurchase,
   stockPurchases,
+  creditPayments,
+  type CreditPayment,
+  type InsertCreditPayment,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./auth";
@@ -324,6 +327,12 @@ export interface IStorage {
   // Capital Transactions
   getCapitalTransactions(ownerAccountId: string): Promise<CapitalTransaction[]>;
   createCapitalTransaction(data: InsertCapitalTransaction): Promise<CapitalTransaction>;
+
+  // Credit System
+  getCreditInvoices(): Promise<SalesInvoiceWithItems[]>;
+  recordCreditPayment(payment: InsertCreditPayment): Promise<CreditPayment>;
+  getCreditPayments(invoiceId: string): Promise<CreditPayment[]>;
+  getCreditSummary(): Promise<{ totalReceivables: number; totalPayables: number; receivablesCount: number; payablesCount: number }>;
 }
 
 export class MemStorage implements IStorage {
@@ -926,6 +935,13 @@ export class MemStorage implements IStorage {
 
   async deleteMessage(messageId: string): Promise<boolean> {
     return this.messages.delete(messageId);
+  }
+
+  async getCreditInvoices(): Promise<SalesInvoiceWithItems[]> { return []; }
+  async recordCreditPayment(payment: InsertCreditPayment): Promise<CreditPayment> { throw new Error("Not implemented"); }
+  async getCreditPayments(invoiceId: string): Promise<CreditPayment[]> { return []; }
+  async getCreditSummary(): Promise<{ totalReceivables: number; totalPayables: number; receivablesCount: number; payablesCount: number }> {
+    return { totalReceivables: 0, totalPayables: 0, receivablesCount: 0, payablesCount: 0 };
   }
 }
 
@@ -2451,6 +2467,66 @@ export class PostgreSQLStorage implements IStorage {
   async createCapitalTransaction(data: InsertCapitalTransaction): Promise<CapitalTransaction> {
     const [transaction] = await db.insert(capitalTransactions).values(data).returning();
     return transaction;
+  }
+
+  async getCreditInvoices(): Promise<SalesInvoiceWithItems[]> {
+    const invoices = await db.select().from(salesInvoices)
+      .where(sql`${salesInvoices.paymentStatus} IN ('unpaid', 'partially_paid')`)
+      .orderBy(desc(salesInvoices.createdAt));
+    const allItems = await db.select().from(invoiceItems);
+    return invoices.map(invoice => ({
+      ...invoice,
+      items: allItems.filter(item => item.invoiceId === invoice.id),
+    }));
+  }
+
+  async recordCreditPayment(payment: InsertCreditPayment): Promise<CreditPayment> {
+    const [created] = await db.insert(creditPayments).values(payment).returning();
+
+    const invoice = await db.select().from(salesInvoices).where(eq(salesInvoices.id, payment.invoiceId));
+    if (invoice.length > 0) {
+      const currentPaid = parseFloat(invoice[0].paidAmount || "0");
+      const totalAmount = parseFloat(invoice[0].totalAmount);
+      const paymentAmount = parseFloat(payment.amount);
+      const newPaid = currentPaid + paymentAmount;
+      const newRemaining = Math.max(0, totalAmount - newPaid);
+      const newStatus = newRemaining <= 0 ? "paid" : "partially_paid";
+
+      await db.update(salesInvoices).set({
+        paidAmount: String(newPaid),
+        remainingAmount: String(newRemaining),
+        paymentStatus: newStatus,
+      }).where(eq(salesInvoices.id, payment.invoiceId));
+    }
+
+    return created;
+  }
+
+  async getCreditPayments(invoiceId: string): Promise<CreditPayment[]> {
+    return await db.select().from(creditPayments)
+      .where(eq(creditPayments.invoiceId, invoiceId))
+      .orderBy(desc(creditPayments.createdAt));
+  }
+
+  async getCreditSummary(): Promise<{ totalReceivables: number; totalPayables: number; receivablesCount: number; payablesCount: number }> {
+    const receivablesResult = await db.select({
+      total: sql<number>`COALESCE(SUM(CAST(${salesInvoices.remainingAmount} AS NUMERIC)), 0)`,
+      count: sql<number>`COUNT(*)`,
+    }).from(salesInvoices)
+      .where(sql`${salesInvoices.paymentStatus} IN ('unpaid', 'partially_paid')`);
+
+    const payablesResult = await db.select({
+      total: sql<number>`COALESCE(SUM(CAST(${suppliers.balanceOwed} AS NUMERIC)), 0)`,
+      count: sql<number>`COUNT(*)`,
+    }).from(suppliers)
+      .where(sql`CAST(${suppliers.balanceOwed} AS NUMERIC) > 0`);
+
+    return {
+      totalReceivables: Number(receivablesResult[0]?.total || 0),
+      totalPayables: Number(payablesResult[0]?.total || 0),
+      receivablesCount: Number(receivablesResult[0]?.count || 0),
+      payablesCount: Number(payablesResult[0]?.count || 0),
+    };
   }
 }
 

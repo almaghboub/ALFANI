@@ -19,6 +19,7 @@ import Products from "@/pages/products";
 import Inventory from "@/pages/inventory";
 import Invoice from "@/pages/invoice";
 import Sales from "@/pages/sales";
+import Credits from "@/pages/credits";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -149,6 +150,12 @@ function Router() {
       <Route path="/expenses">
         <RoleProtectedRoute allowedRoles={["owner"]}>
           <Expenses />
+        </RoleProtectedRoute>
+      </Route>
+
+      <Route path="/credits">
+        <RoleProtectedRoute allowedRoles={["owner"]}>
+          <Credits />
         </RoleProtectedRoute>
       </Route>
 

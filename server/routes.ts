@@ -33,6 +33,7 @@ import {
   insertAccountingEntrySchema,
   insertProductSchema,
   insertBranchInventorySchema,
+  insertCreditPaymentSchema,
   loginSchema,
 } from "@shared/schema";
 import { darbAssabilService } from "./services/darbAssabil";
@@ -2593,7 +2594,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalAmount = Math.max(subtotal - discountAmt + svcAmount, 0);
       
       const userId = (req.user as any)?.id || null;
-      const invoiceData = {
+      const paymentType = req.body.paymentType || "cash";
+      const isCredit = paymentType === "credit";
+      const invoiceData: any = {
         invoiceNumber,
         customerName: customerName.trim(),
         branch,
@@ -2605,6 +2608,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalAmount: String(totalAmount),
         safeId: safeId || null,
         createdByUserId: userId,
+        paymentStatus: isCredit ? "unpaid" : "paid",
+        paidAmount: isCredit ? "0" : String(totalAmount),
+        remainingAmount: isCredit ? String(totalAmount) : "0",
       };
       
       const itemBranches = items.map((item: any) => item.branch || branch);
@@ -2823,6 +2829,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to process return:", error);
       res.status(500).json({ message: "Failed to process return" });
+    }
+  });
+
+  // ============ CREDIT SYSTEM ROUTES ============
+
+  app.get("/api/credit/invoices", requireAuth, async (req, res) => {
+    try {
+      const invoices = await storage.getCreditInvoices();
+      res.json(invoices);
+    } catch (error) {
+      console.error("Failed to fetch credit invoices:", error);
+      res.status(500).json({ message: "Failed to fetch credit invoices" });
+    }
+  });
+
+  app.get("/api/credit/summary", requireAuth, async (req, res) => {
+    try {
+      const summary = await storage.getCreditSummary();
+      res.json(summary);
+    } catch (error) {
+      console.error("Failed to fetch credit summary:", error);
+      res.status(500).json({ message: "Failed to fetch credit summary" });
+    }
+  });
+
+  app.post("/api/credit/payments", requireAuth, async (req, res) => {
+    try {
+      const { invoiceId, amount, paymentMethod, safeId, description } = req.body;
+
+      if (!invoiceId || !amount) {
+        return res.status(400).json({ message: "invoiceId and amount are required" });
+      }
+
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
+
+      const userId = (req.user as any)?.id || null;
+      const payment = await storage.recordCreditPayment({
+        invoiceId,
+        amount: String(parsedAmount),
+        paymentMethod: paymentMethod || "cash",
+        safeId: safeId || null,
+        description: description || null,
+        createdByUserId: userId,
+      });
+
+      if (safeId) {
+        try {
+          await storage.createSafeTransaction({
+            safeId,
+            type: 'deposit',
+            amountUSD: "0",
+            amountLYD: String(parsedAmount),
+            description: `Credit payment for invoice ${invoiceId}`,
+            referenceType: 'credit_payment',
+            referenceId: payment.id,
+            createdByUserId: userId || 'system',
+          });
+        } catch (safeTxErr: any) {
+          console.error("Safe transaction for credit payment failed:", safeTxErr?.message);
+        }
+      }
+
+      res.status(201).json(payment);
+    } catch (error) {
+      console.error("Failed to record credit payment:", error);
+      res.status(500).json({ message: "Failed to record credit payment" });
+    }
+  });
+
+  app.get("/api/credit/payments/:invoiceId", requireAuth, async (req, res) => {
+    try {
+      const payments = await storage.getCreditPayments(req.params.invoiceId);
+      res.json(payments);
+    } catch (error) {
+      console.error("Failed to fetch credit payments:", error);
+      res.status(500).json({ message: "Failed to fetch credit payments" });
+    }
+  });
+
+  app.get("/api/credit/supplier-debts", requireAuth, async (req, res) => {
+    try {
+      const allSuppliers = await storage.getAllSuppliers();
+      const debtors = allSuppliers.filter(s => parseFloat(s.balanceOwed) > 0);
+      res.json(debtors);
+    } catch (error) {
+      console.error("Failed to fetch supplier debts:", error);
+      res.status(500).json({ message: "Failed to fetch supplier debts" });
+    }
+  });
+
+  app.post("/api/credit/supplier-payments", requireAuth, async (req, res) => {
+    try {
+      const { supplierId, amount, safeId, description } = req.body;
+
+      if (!supplierId || !amount) {
+        return res.status(400).json({ message: "supplierId and amount are required" });
+      }
+
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
+
+      const allSuppliers = await storage.getAllSuppliers();
+      const supplier = allSuppliers.find(s => s.id === supplierId);
+      if (!supplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+
+      const currentBalance = parseFloat(supplier.balanceOwed);
+      const newBalance = Math.max(0, currentBalance - parsedAmount);
+      await storage.updateSupplier(supplierId, { balanceOwed: String(newBalance) });
+
+      const userId = (req.user as any)?.id || null;
+
+      if (safeId) {
+        try {
+          await storage.createSafeTransaction({
+            safeId,
+            type: 'withdrawal',
+            amountUSD: "0",
+            amountLYD: String(parsedAmount),
+            description: `Supplier payment: ${supplier.name} - ${description || ''}`,
+            referenceType: 'supplier_payment',
+            referenceId: supplierId,
+            createdByUserId: userId || 'system',
+          });
+        } catch (safeTxErr: any) {
+          console.error("Safe transaction for supplier payment failed:", safeTxErr?.message);
+        }
+      }
+
+      res.status(201).json({ message: "Supplier payment recorded", newBalance });
+    } catch (error) {
+      console.error("Failed to record supplier payment:", error);
+      res.status(500).json({ message: "Failed to record supplier payment" });
     }
   });
 
