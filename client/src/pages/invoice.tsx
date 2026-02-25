@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Product, ProductWithInventory, Safe } from "@shared/schema";
+import type { Product, ProductWithInventory, Safe, Setting } from "@shared/schema";
 import logoPath from "@assets/alfani-logo.png";
 
 function getLogoBase64(src: string): Promise<string> {
@@ -90,6 +90,25 @@ export default function Invoice() {
     queryKey: ["/api/safes"],
   });
 
+  const { data: allSettings = [] } = useQuery<Setting[]>({
+    queryKey: ["/api/settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const markupPercentage = (() => {
+    const setting = allSettings.find(s => s.key === "global_markup_percentage");
+    return setting ? parseFloat(setting.value) || 0 : 0;
+  })();
+
+  const applyMarkup = (basePrice: number) => {
+    if (markupPercentage <= 0) return basePrice;
+    return basePrice * (1 + markupPercentage / 100);
+  };
+
   useEffect(() => {
     if (safes.length > 0 && !selectedSafeId) {
       setSelectedSafeId(safes[0].id);
@@ -153,12 +172,13 @@ export default function Invoice() {
           : item
       ));
     } else {
+      const markedUpPrice = applyMarkup(Number(product.price || 0));
       setCart([...cart, {
         productId: product.id,
         productName: product.name,
         quantity: 1,
-        unitPrice: Number(product.price || 0),
-        lineTotal: Number(product.price || 0),
+        unitPrice: Math.round(markedUpPrice * 100) / 100,
+        lineTotal: Math.round(markedUpPrice * 100) / 100,
         branch: branch,
       }]);
     }
@@ -616,6 +636,13 @@ export default function Invoice() {
       <Header title={t("newInvoice")} description={t("createNewInvoice")} />
       
       <div className="p-6">
+        {markupPercentage > 0 && (
+          <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800 flex items-center gap-2" data-testid="markup-banner">
+            <span className="text-orange-600 dark:text-orange-400 font-semibold text-sm">
+              +{markupPercentage}% {t("markupApplied")}
+            </span>
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
@@ -666,7 +693,16 @@ export default function Invoice() {
                       <TableRow key={product.id}>
                         <TableCell>{product.name}</TableCell>
                         <TableCell>{product.sku || "-"}</TableCell>
-                        <TableCell>{Number(product.price || 0).toFixed(2)} LYD</TableCell>
+                        <TableCell>
+                          {markupPercentage > 0 ? (
+                            <div>
+                              <span className="font-medium">{applyMarkup(Number(product.price || 0)).toFixed(2)} LYD</span>
+                              <span className="block text-xs text-muted-foreground line-through">{Number(product.price || 0).toFixed(2)}</span>
+                            </div>
+                          ) : (
+                            <span>{Number(product.price || 0).toFixed(2)} LYD</span>
+                          )}
+                        </TableCell>
                         <TableCell>{getAvailableQuantity(product)}</TableCell>
                         <TableCell>
                           <Button

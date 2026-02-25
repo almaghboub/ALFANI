@@ -48,6 +48,15 @@ The system features comprehensive functionality with responsive interface, bilin
   - Backend: GET `/api/reports/performance?range=daily|weekly|monthly&country[]=...&dateFrom=...&dateTo=...`
   - Bilingual display (English/Arabic) with proper RTL layout
 
+- **Global Price Markup System (February 2026)**:
+  - Owner-controlled global percentage markup to protect prices against exchange rate instability
+  - Setting stored as `global_markup_percentage` in settings table
+  - Formula: `Final Price = Base Price × (1 + Markup / 100)`
+  - Base prices in database are NEVER modified — markup applied dynamically at display/invoice time
+  - Invoice page shows markup banner when active, product list shows both base and final prices
+  - Settings page UI with percentage input, save button, and live example preview
+  - Full bilingual support (English/Arabic)
+
 - **LYD Currency Conversion System with Dual Exchange Rates (November 2025)**: 
   - `useLydExchangeRate` hook for centralized management
   - Dual-currency display (USD/LYD) across dashboards, orders, customers, invoices, and profit reports

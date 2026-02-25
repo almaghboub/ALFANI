@@ -631,6 +631,7 @@ export default function Settings() {
   const [settingsState, setSettingsState] = useState(DEFAULT_SETTINGS);
   const [lydExchangeRate, setLydExchangeRate] = useState<string>("");
   const [lydPurchaseExchangeRate, setLydPurchaseExchangeRate] = useState<string>("");
+  const [globalMarkup, setGlobalMarkup] = useState<string>("");
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -678,6 +679,9 @@ export default function Settings() {
         // Handle LYD purchase exchange rate
         if (setting.key === "lyd_purchase_exchange_rate") {
           setLydPurchaseExchangeRate(setting.value);
+        }
+        if (setting.key === "global_markup_percentage") {
+          setGlobalMarkup(setting.value);
         }
       });
       setSettingsState(settingsObj);
@@ -816,6 +820,51 @@ export default function Settings() {
       toast({
         title: t('error'),
         description: t('enterValidPurchaseExchangeRate'),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateMarkupMutation = useMutation({
+    mutationFn: async (value: string) => {
+      const existingSetting = settings.find(s => s.key === "global_markup_percentage");
+      if (existingSetting) {
+        const response = await apiRequest("PUT", `/api/settings/global_markup_percentage`, { value, type: "number" });
+        return response.json();
+      } else {
+        const response = await apiRequest("POST", "/api/settings", {
+          key: "global_markup_percentage",
+          value,
+          type: "number",
+          description: "Global price markup percentage"
+        });
+        return response.json();
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({
+        title: t('success'),
+        description: t('markupUpdated'),
+      });
+    },
+    onError: () => {
+      toast({
+        title: t('error'),
+        description: t('markupUpdated'),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleMarkupSave = () => {
+    const val = parseFloat(globalMarkup);
+    if (!isNaN(val) && val >= 0) {
+      updateMarkupMutation.mutate(String(val));
+    } else {
+      toast({
+        title: t('error'),
+        description: t('enterMarkupPercentage'),
         variant: "destructive",
       });
     }
@@ -1373,6 +1422,57 @@ export default function Settings() {
                   <SelectItem value="ar">{t('arabicWithName')}</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="global-markup" className="text-base font-semibold">{t('globalMarkup')}</Label>
+                <p className="text-sm text-muted-foreground">
+                  {t('globalMarkupDesc')}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input 
+                    id="global-markup"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    placeholder={t('enterMarkupPercentage')}
+                    value={globalMarkup}
+                    onChange={(e) => setGlobalMarkup(e.target.value)}
+                    className="pr-8"
+                    data-testid="input-global-markup"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">%</span>
+                </div>
+                <Button 
+                  onClick={handleMarkupSave}
+                  disabled={updateMarkupMutation.isPending}
+                  data-testid="button-save-markup"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {t('save')}
+                </Button>
+              </div>
+              {globalMarkup && parseFloat(globalMarkup) > 0 ? (
+                <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                    {t('currentMarkup')}: {parseFloat(globalMarkup)}%
+                  </p>
+                  <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">
+                    {t('markupExample')}: {(100 * (1 + parseFloat(globalMarkup) / 100)).toFixed(2)} LYD
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 bg-gray-50 dark:bg-gray-950/20 rounded-lg border border-gray-200 dark:border-gray-800">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {t('noMarkup')}
+                  </p>
+                </div>
+              )}
             </div>
 
             <Separator />
