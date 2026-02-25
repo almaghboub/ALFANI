@@ -172,14 +172,13 @@ export async function initializeDatabase() {
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         safe_id VARCHAR NOT NULL REFERENCES safes(id),
         type transaction_type NOT NULL,
-        amount DECIMAL(15,2) NOT NULL,
-        currency TEXT NOT NULL DEFAULT 'USD',
+        amount_usd DECIMAL(15,2) NOT NULL DEFAULT 0,
+        amount_lyd DECIMAL(15,2) NOT NULL DEFAULT 0,
         exchange_rate DECIMAL(10,4),
+        description TEXT,
         reference_type TEXT,
         reference_id VARCHAR,
-        description TEXT,
-        performed_by VARCHAR,
-        balanced BOOLEAN NOT NULL DEFAULT false,
+        created_by_user_id VARCHAR NOT NULL DEFAULT 'system',
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
 
@@ -550,6 +549,131 @@ async function migrateProductsTable() {
       `);
     }
 
+    // Ensure all required enums exist
+    const enumDefs = [
+      `CREATE TYPE transaction_type AS ENUM ('deposit', 'withdrawal', 'transfer', 'settlement', 'currency_adjustment')`,
+      `CREATE TYPE purchase_type AS ENUM ('paid_now', 'on_credit', 'initial_stock')`,
+      `CREATE TYPE expense_category AS ENUM ('employee_salaries', 'supplier_expenses', 'marketing_commission', 'rent', 'cleaning_salaries', 'other')`,
+      `CREATE TYPE receipt_type AS ENUM ('payment', 'collection')`,
+      `CREATE TYPE user_role AS ENUM ('owner', 'customer_service', 'receptionist', 'sorter', 'stock_manager', 'shipping_staff')`,
+      `CREATE TYPE order_status AS ENUM ('pending', 'processing', 'shipped', 'delivered', 'cancelled', 'partially_arrived', 'ready_to_collect', 'with_shipping_company', 'ready_to_buy')`,
+      `CREATE TYPE task_status AS ENUM ('pending', 'completed', 'to_collect')`,
+      `CREATE TYPE task_type AS ENUM ('task', 'delivery', 'pickup', 'receive_payment')`,
+      `CREATE TYPE currency AS ENUM ('USD', 'LYD')`,
+      `CREATE TYPE account_type AS ENUM ('debit', 'credit')`,
+    ];
+    for (const enumDef of enumDefs) {
+      await pool.query(`DO $$ BEGIN ${enumDef}; EXCEPTION WHEN duplicate_object THEN null; END $$;`);
+    }
+
+    // Create revenue_accounts table if missing (dependency for safes)
+    const revenueAccountsExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'revenue_accounts'
+    `);
+    if (revenueAccountsExists.rows.length === 0) {
+      console.log("Migrating: creating revenue_accounts table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS revenue_accounts (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          parent_id VARCHAR REFERENCES revenue_accounts(id),
+          description TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // Create safes table if missing (needed by sales_invoices, stock_purchases, safe_transactions)
+    const safesExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'safes'
+    `);
+    if (safesExists.rows.length === 0) {
+      console.log("Migrating: creating safes table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS safes (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          parent_id VARCHAR REFERENCES safes(id),
+          currency TEXT NOT NULL DEFAULT 'USD',
+          is_multi_currency BOOLEAN NOT NULL DEFAULT false,
+          balance_usd DECIMAL(15,2) NOT NULL DEFAULT 0,
+          balance_lyd DECIMAL(15,2) NOT NULL DEFAULT 0,
+          description TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // Create safe_transactions table if missing (needed by stock_purchases)
+    const safeTransExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'safe_transactions'
+    `);
+    if (safeTransExists.rows.length === 0) {
+      console.log("Migrating: creating safe_transactions table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS safe_transactions (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          safe_id VARCHAR NOT NULL REFERENCES safes(id),
+          type transaction_type NOT NULL,
+          amount_usd DECIMAL(15,2) NOT NULL DEFAULT 0,
+          amount_lyd DECIMAL(15,2) NOT NULL DEFAULT 0,
+          exchange_rate DECIMAL(10,4),
+          description TEXT,
+          reference_type TEXT,
+          reference_id VARCHAR,
+          created_by_user_id VARCHAR NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    } else {
+      // Migrate old safe_transactions table from single 'amount' column to dual currency columns
+      try {
+        const stCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'safe_transactions'`);
+        const stColNames = stCols.rows.map((r: any) => r.column_name);
+        if (!stColNames.includes('amount_usd')) {
+          console.log("Migrating: adding amount_usd/amount_lyd columns to safe_transactions...");
+          await pool.query(`ALTER TABLE safe_transactions ADD COLUMN amount_usd DECIMAL(15,2) NOT NULL DEFAULT 0`);
+          await pool.query(`ALTER TABLE safe_transactions ADD COLUMN amount_lyd DECIMAL(15,2) NOT NULL DEFAULT 0`);
+          if (stColNames.includes('amount')) {
+            await pool.query(`UPDATE safe_transactions SET amount_usd = amount WHERE amount IS NOT NULL`);
+          }
+        }
+        if (!stColNames.includes('created_by_user_id')) {
+          await pool.query(`ALTER TABLE safe_transactions ADD COLUMN created_by_user_id VARCHAR NOT NULL DEFAULT 'system'`);
+        }
+      } catch (e) { /* migration may already be done */ }
+    }
+
+    // Create suppliers table if missing (needed by stock_purchases)
+    const suppliersExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'suppliers'
+    `);
+    if (suppliersExists.rows.length === 0) {
+      console.log("Migrating: creating suppliers table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS suppliers (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          phone TEXT,
+          email TEXT,
+          address TEXT,
+          balance_owed DECIMAL(15,2) NOT NULL DEFAULT 0,
+          currency TEXT NOT NULL DEFAULT 'USD',
+          notes TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
     // Create sales_invoices table if missing
     const invoicesExists = await pool.query(`
       SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sales_invoices'
@@ -563,32 +687,38 @@ async function migrateProductsTable() {
           customer_name TEXT NOT NULL,
           branch branch NOT NULL,
           total_amount DECIMAL(10,2) NOT NULL,
+          subtotal DECIMAL(10,2),
+          discount_type TEXT DEFAULT 'amount',
+          discount_value DECIMAL(10,2) DEFAULT 0,
+          discount_amount DECIMAL(10,2) DEFAULT 0,
+          service_amount DECIMAL(10,2) DEFAULT 0,
           safe_id VARCHAR REFERENCES safes(id),
+          created_by_user_id VARCHAR,
           created_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
       `);
-    }
-
-    // Add discount columns to sales_invoices if missing
-    const invoiceCols = await pool.query(`
-      SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'sales_invoices'
-    `);
-    const invColNames = invoiceCols.rows.map((r: any) => r.column_name);
-    if (!invColNames.includes('subtotal')) {
-      console.log("Migrating: adding discount columns to sales_invoices...");
-      await pool.query(`ALTER TABLE sales_invoices ADD COLUMN subtotal DECIMAL(10,2)`);
-      await pool.query(`ALTER TABLE sales_invoices ADD COLUMN discount_type TEXT DEFAULT 'amount'`);
-      await pool.query(`ALTER TABLE sales_invoices ADD COLUMN discount_value DECIMAL(10,2) DEFAULT 0`);
-      await pool.query(`ALTER TABLE sales_invoices ADD COLUMN discount_amount DECIMAL(10,2) DEFAULT 0`);
-    }
-    if (!invColNames.includes('service_amount')) {
-      console.log("Migrating: adding service_amount column to sales_invoices...");
-      await pool.query(`ALTER TABLE sales_invoices ADD COLUMN service_amount DECIMAL(10,2) DEFAULT 0`);
-    }
-    if (!invColNames.includes('created_by_user_id')) {
-      console.log("Migrating: adding created_by_user_id column to sales_invoices...");
-      await pool.query(`ALTER TABLE sales_invoices ADD COLUMN created_by_user_id VARCHAR`);
+    } else {
+      // Add missing columns to existing sales_invoices
+      const invoiceCols = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'sales_invoices'
+      `);
+      const invColNames = invoiceCols.rows.map((r: any) => r.column_name);
+      if (!invColNames.includes('subtotal')) {
+        console.log("Migrating: adding discount columns to sales_invoices...");
+        await pool.query(`ALTER TABLE sales_invoices ADD COLUMN subtotal DECIMAL(10,2)`);
+        await pool.query(`ALTER TABLE sales_invoices ADD COLUMN discount_type TEXT DEFAULT 'amount'`);
+        await pool.query(`ALTER TABLE sales_invoices ADD COLUMN discount_value DECIMAL(10,2) DEFAULT 0`);
+        await pool.query(`ALTER TABLE sales_invoices ADD COLUMN discount_amount DECIMAL(10,2) DEFAULT 0`);
+      }
+      if (!invColNames.includes('service_amount')) {
+        console.log("Migrating: adding service_amount column to sales_invoices...");
+        await pool.query(`ALTER TABLE sales_invoices ADD COLUMN service_amount DECIMAL(10,2) DEFAULT 0`);
+      }
+      if (!invColNames.includes('created_by_user_id')) {
+        console.log("Migrating: adding created_by_user_id column to sales_invoices...");
+        await pool.query(`ALTER TABLE sales_invoices ADD COLUMN created_by_user_id VARCHAR`);
+      }
     }
 
     // Create invoice_items table if missing
@@ -609,14 +739,6 @@ async function migrateProductsTable() {
         )
       `);
     }
-
-    // Create purchase_type enum if not exists
-    await pool.query(`
-      DO $$ BEGIN
-        CREATE TYPE purchase_type AS ENUM ('paid_now', 'on_credit', 'initial_stock');
-      EXCEPTION WHEN duplicate_object THEN null;
-      END $$;
-    `);
 
     // Create stock_purchases table if missing
     const stockPurchasesExists = await pool.query(`
@@ -647,30 +769,6 @@ async function migrateProductsTable() {
       `);
     }
 
-    // Create suppliers table if missing
-    const suppliersExists = await pool.query(`
-      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'suppliers'
-    `);
-    if (suppliersExists.rows.length === 0) {
-      console.log("Migrating: creating suppliers table...");
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS suppliers (
-          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-          name TEXT NOT NULL,
-          code TEXT NOT NULL UNIQUE,
-          phone TEXT,
-          email TEXT,
-          address TEXT,
-          balance_owed DECIMAL(15,2) NOT NULL DEFAULT 0,
-          currency TEXT NOT NULL DEFAULT 'USD',
-          notes TEXT,
-          is_active BOOLEAN NOT NULL DEFAULT true,
-          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-        )
-      `);
-    }
-
     // Create accounting_entries table if missing
     const accountingExists = await pool.query(`
       SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'accounting_entries'
@@ -694,6 +792,105 @@ async function migrateProductsTable() {
           reference_id VARCHAR,
           created_by_user_id VARCHAR NOT NULL,
           created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // Create owner_accounts table if missing
+    const ownerAccountsExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'owner_accounts'
+    `);
+    if (ownerAccountsExists.rows.length === 0) {
+      console.log("Migrating: creating owner_accounts table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS owner_accounts (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT NOT NULL,
+          description TEXT,
+          total_invested DECIMAL(15,2) NOT NULL DEFAULT 0,
+          total_withdrawn DECIMAL(15,2) NOT NULL DEFAULT 0,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // Create capital_transactions table if missing
+    const capitalTransExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'capital_transactions'
+    `);
+    if (capitalTransExists.rows.length === 0) {
+      console.log("Migrating: creating capital_transactions table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS capital_transactions (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          owner_account_id VARCHAR NOT NULL REFERENCES owner_accounts(id),
+          type TEXT NOT NULL,
+          amount DECIMAL(15,2) NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'USD',
+          safe_id VARCHAR REFERENCES safes(id),
+          description TEXT,
+          performed_by VARCHAR,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // Create expense_categories table if missing
+    const expCatExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'expense_categories'
+    `);
+    if (expCatExists.rows.length === 0) {
+      console.log("Migrating: creating expense_categories table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS expense_categories (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          parent_id VARCHAR,
+          description TEXT,
+          budget_limit DECIMAL(15,2),
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // Create expenses table if missing
+    const expensesExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'expenses'
+    `);
+    if (expensesExists.rows.length === 0) {
+      console.log("Migrating: creating expenses table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS expenses (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          description TEXT NOT NULL,
+          amount DECIMAL(10,2) NOT NULL,
+          category expense_category NOT NULL DEFAULT 'other',
+          currency TEXT NOT NULL DEFAULT 'USD',
+          date TIMESTAMP NOT NULL DEFAULT NOW(),
+          notes TEXT,
+          created_by VARCHAR,
+          safe_id VARCHAR REFERENCES safes(id),
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // Create settings table if missing
+    const settingsExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'settings'
+    `);
+    if (settingsExists.rows.length === 0) {
+      console.log("Migrating: creating settings table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS settings (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          key TEXT NOT NULL UNIQUE,
+          value TEXT NOT NULL,
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
       `);
     }
