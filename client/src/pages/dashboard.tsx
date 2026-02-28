@@ -167,7 +167,7 @@ export default function Dashboard() {
       invoiceRelated: true,
     },
   ];
-  const metricCards = allMetricCards.filter(card => !card.ownerOnly || (card.invoiceRelated ? canAccessInvoices : isOwner));
+  const metricCards = allMetricCards.filter(card => !card.ownerOnly || isOwner);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen" dir={isRTL ? "rtl" : "ltr"}>
@@ -326,7 +326,7 @@ export default function Dashboard() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {canAccessInvoices && (
+          {isOwner && (
           <Card className="border-border/50 animate-fade-in" data-testid="card-sales-chart">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-semibold">{t('salesTrend') || "Sales Trend"}</CardTitle>
@@ -429,7 +429,7 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-bold">{Number(inv.totalAmount).toFixed(2)} LYD</p>
+                          {isOwner && <p className="text-sm font-bold">{Number(inv.totalAmount).toFixed(2)} LYD</p>}
                           <Badge variant="outline" className="text-[10px] font-medium">{inv.branch}</Badge>
                         </div>
                       </div>

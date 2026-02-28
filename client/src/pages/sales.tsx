@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/components/auth-provider";
 import type { SalesInvoiceWithItems, ProductWithInventory } from "@shared/schema";
 import logoPath from "@assets/alfani-logo.png";
 
@@ -48,6 +49,8 @@ function getLogoBase64(src: string): Promise<string> {
 export default function Sales() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isOwner = user?.role === 'owner';
   const printRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoiceWithItems | null>(null);
@@ -668,6 +671,7 @@ export default function Sales() {
       <Header title={t("salesHistory")} description={t("viewAllInvoices")} />
       
       <div className="p-6 space-y-6">
+        {isOwner && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-2">
@@ -694,6 +698,7 @@ export default function Sales() {
             </CardContent>
           </Card>
         </div>
+        )}
 
         <Card>
           <CardHeader>

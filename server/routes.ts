@@ -2563,12 +2563,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
       
+      const isOwner = user.role === 'owner';
       res.json({
-        totalSales,
-        totalItems,
-        invoiceCount,
-        avgOrderValue,
-        byBranch,
+        totalSales: isOwner ? totalSales : 0,
+        totalItems: isOwner ? totalItems : 0,
+        invoiceCount: isOwner ? invoiceCount : 0,
+        avgOrderValue: isOwner ? avgOrderValue : 0,
+        byBranch: isOwner ? byBranch : {},
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch invoice metrics" });
