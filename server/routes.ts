@@ -37,6 +37,60 @@ import {
   loginSchema,
 } from "@shared/schema";
 import { darbAssabilService } from "./services/darbAssabil";
+import { pool } from "./db";
+
+async function logOperation(
+  operation: string,
+  invoiceId: string | null,
+  productId: string | null,
+  quantity: number | null,
+  details: Record<string, any> | null,
+  error: string | null,
+  createdBy: string | null
+): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO operation_log (id, operation, invoice_id, product_id, quantity, details, error, created_by, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW())`,
+      [operation, invoiceId, productId, quantity, details ? JSON.stringify(details) : null, error, createdBy]
+    );
+  } catch (e) {
+    console.error("Failed to write operation log:", e);
+  }
+}
+
+async function acquireIdempotencyKey(key: string | undefined): Promise<{ acquired: boolean; existingResponse?: any }> {
+  if (!key) return { acquired: true };
+  try {
+    const insertResult = await pool.query(
+      `INSERT INTO idempotency_keys (key, response, created_at) VALUES ($1, NULL, NOW()) ON CONFLICT (key) DO NOTHING RETURNING key`,
+      [key]
+    );
+    if (insertResult.rowCount && insertResult.rowCount > 0) {
+      return { acquired: true };
+    }
+    const existing = await pool.query(`SELECT response FROM idempotency_keys WHERE key = $1`, [key]);
+    if (existing.rows.length > 0 && existing.rows[0].response) {
+      return { acquired: false, existingResponse: existing.rows[0].response };
+    }
+    return { acquired: false, existingResponse: { message: "Request is being processed" } };
+  } catch (e) {
+    console.error("Idempotency check failed:", e);
+    return { acquired: true };
+  }
+}
+
+async function finalizeIdempotencyKey(key: string | undefined, response: any): Promise<void> {
+  if (!key) return;
+  try {
+    await pool.query(
+      `UPDATE idempotency_keys SET response = $2 WHERE key = $1`,
+      [key, JSON.stringify(response)]
+    );
+  } catch (e) {
+    console.error("Failed to finalize idempotency key:", e);
+  }
+}
 
 declare global {
   namespace Express {
@@ -2525,7 +2579,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/invoices", requireAuth, async (req, res) => {
+    const userId = (req.user as any)?.id || null;
+    const idempotencyKey = req.headers['x-idempotency-key'] as string | undefined;
+
     try {
+      const idem = await acquireIdempotencyKey(idempotencyKey);
+      if (!idem.acquired) {
+        return res.status(200).json(idem.existingResponse);
+      }
+
       const { customerName, branch, items, safeId, discountType, discountValue, serviceAmount } = req.body;
       
       if (!customerName || typeof customerName !== 'string' || customerName.trim() === '') {
@@ -2554,14 +2616,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Invalid unit price" });
         }
         item.unitPrice = price;
-      }
-      
-      for (const item of items) {
-        const itemBranch = item.branch || branch;
-        const stockCheck = await storage.checkInvoiceStock(itemBranch, [{ productId: item.productId, quantity: item.quantity }]);
-        if (!stockCheck.success) {
-          return res.status(400).json({ message: `${item.productName}: ${stockCheck.message}` });
-        }
       }
       
       const invoiceNumber = await storage.generateInvoiceNumber();
@@ -2593,7 +2647,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const svcAmount = parseFloat(serviceAmount) || 0;
       const totalAmount = Math.max(subtotal - discountAmt + svcAmount, 0);
       
-      const userId = (req.user as any)?.id || null;
       const paymentType = req.body.paymentType || "cash";
       const isCredit = paymentType === "credit";
       const invoiceData: any = {
@@ -2618,7 +2671,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.status(201).json(invoice);
 
-      if (safeId) {
+      await finalizeIdempotencyKey(idempotencyKey, invoice);
+
+      for (const item of items) {
+        logOperation('invoice_create_item', invoice.id, item.productId, item.quantity,
+          { invoiceNumber, customerName: customerName.trim(), unitPrice: item.unitPrice, branch: item.branch || branch },
+          null, userId);
+      }
+      logOperation('invoice_create', invoice.id, null, null,
+        { invoiceNumber, customerName: customerName.trim(), totalAmount, branch, itemCount: items.length, paymentType },
+        null, userId);
+
+      if (safeId && !isCredit) {
         try {
           await storage.createSafeTransaction({
             safeId,
@@ -2634,9 +2698,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Safe transaction failed (invoice still created):", safeTxErr?.message);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create invoice:", error);
-      res.status(500).json({ message: "Failed to create invoice" });
+      logOperation('invoice_create_error', null, null, null,
+        { body: req.body }, error?.message || String(error), userId);
+      if (!res.headersSent) {
+        res.status(500).json({ message: error?.message || "Failed to create invoice" });
+      }
     }
   });
 
@@ -2716,10 +2784,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      logOperation('invoice_edit', id, null, null,
+        { invoiceNumber: existingInvoice.invoiceNumber, oldTotal, newTotal, itemCount: items?.length },
+        null, user.id);
+
       res.json(invoice);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update invoice:", error);
-      res.status(500).json({ message: "Failed to update invoice" });
+      logOperation('invoice_edit_error', req.params.id, null, null,
+        { body: req.body }, error?.message || String(error), (req.user as any)?.id);
+      if (!res.headersSent) {
+        res.status(500).json({ message: error?.message || "Failed to update invoice" });
+      }
     }
   });
 
@@ -2753,15 +2829,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      logOperation('invoice_delete', req.params.id, null, null,
+        { invoiceNumber: existingInvoice.invoiceNumber, totalAmount: existingInvoice.totalAmount, customerName: existingInvoice.customerName },
+        null, user.id);
+
       res.json({ message: "Invoice deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete invoice:", error);
+      logOperation('invoice_delete_error', req.params.id, null, null, null, error?.message || String(error), (req.user as any)?.id);
       res.status(500).json({ message: "Failed to delete invoice" });
     }
   });
 
   app.post("/api/invoices/:id/return", requireAuth, async (req, res) => {
+    const userId = (req.user as any)?.id || null;
+    const idempotencyKey = req.headers['x-idempotency-key'] as string | undefined;
+
     try {
+      const idem = await acquireIdempotencyKey(idempotencyKey);
+      if (!idem.acquired) {
+        return res.status(200).json(idem.existingResponse);
+      }
+
       const { id } = req.params;
       const { returnItems } = req.body;
 
@@ -2803,32 +2892,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const result = await storage.returnInvoiceItems(id, returnItems);
-      
+
+      for (const ret of returnItems) {
+        const invoiceItem = existingInvoice.items.find(i => i.id === ret.itemId);
+        logOperation('invoice_return_item', id, invoiceItem?.productId || null, ret.quantity,
+          { invoiceNumber: existingInvoice.invoiceNumber, productName: invoiceItem?.productName, returnAmount },
+          null, userId);
+      }
+
       if (existingInvoice.safeId && returnAmount > 0) {
-        const userId = (req.user as any)?.id || 'system';
-        await storage.createSafeTransaction({
-          safeId: existingInvoice.safeId,
-          type: 'withdrawal',
-          amountUSD: "0",
-          amountLYD: String(returnAmount.toFixed(2)),
-          description: `Return: ${existingInvoice.invoiceNumber} - ${existingInvoice.customerName}`,
-          referenceType: 'invoice_return',
-          referenceId: id,
-          createdByUserId: userId,
-        });
+        try {
+          await storage.createSafeTransaction({
+            safeId: existingInvoice.safeId,
+            type: 'withdrawal',
+            amountUSD: "0",
+            amountLYD: String(returnAmount.toFixed(2)),
+            description: `Return: ${existingInvoice.invoiceNumber} - ${existingInvoice.customerName}`,
+            referenceType: 'invoice_return',
+            referenceId: id,
+            createdByUserId: userId || 'system',
+          });
+        } catch (safeTxErr: any) {
+          console.error("Safe transaction failed on return:", safeTxErr?.message);
+        }
       }
       
       if (result === undefined) {
         const existing = await storage.getInvoice(id);
         if (!existing) {
-          return res.json({ message: "All items returned. Invoice removed.", deleted: true });
+          const responseData = { message: "All items returned. Invoice removed.", deleted: true };
+          await finalizeIdempotencyKey(idempotencyKey, responseData);
+          logOperation('invoice_return_full', id, null, null,
+            { invoiceNumber: existingInvoice.invoiceNumber, returnAmount }, null, userId);
+          return res.json(responseData);
         }
         return res.status(404).json({ message: "Invoice not found" });
       }
+
+      await finalizeIdempotencyKey(idempotencyKey, result);
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to process return:", error);
-      res.status(500).json({ message: "Failed to process return" });
+      logOperation('invoice_return_error', req.params.id, null, null,
+        { body: req.body }, error?.message || String(error), userId);
+      if (!res.headersSent) {
+        res.status(500).json({ message: error?.message || "Failed to process return" });
+      }
     }
   });
 

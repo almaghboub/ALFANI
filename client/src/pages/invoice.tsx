@@ -118,9 +118,13 @@ export default function Invoice() {
 
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: { customerName: string; branch: string; items: CartItem[]; safeId: string | null; discountType: string; discountValue: string; serviceAmount: string; paymentType: string }) => {
+      const idempotencyKey = `inv-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
       const res = await fetch("/api/invoices", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify(data),
         credentials: "include",
       });

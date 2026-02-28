@@ -18,6 +18,14 @@ The frontend is a React 18 TypeScript SPA using Wouter for routing, TanStack Que
 
 The backend is an Express.js TypeScript REST API. It uses Passport.js for authentication and role-based access control. PostgreSQL with Drizzle ORM handles data persistence and session management. API endpoints are feature-organized with Zod for request validation.
 
+**Invoice/Return Transaction Safety (February 2026)**:
+- All invoice operations (create, update, delete, return) wrapped in `db.transaction()` with automatic rollback on failure
+- `SELECT ... FOR UPDATE` row locking on `branch_inventory` and `invoice_items` rows prevents race conditions and over-returns
+- Idempotency keys via `X-Idempotency-Key` header + `idempotency_keys` table prevent duplicate inserts from network retries (atomic acquire pattern)
+- `operation_log` table provides full audit trail for all invoice/return operations
+- Database CHECK constraints: `invoice_items.quantity > 0`, `invoice_items.line_total >= 0`, `branch_inventory.quantity >= 0`
+- Frontend generates unique idempotency keys per invoice creation and return operation
+
 ## Data Storage Solutions
 
 PostgreSQL is the primary database, accessed via Drizzle ORM. Neon serverless PostgreSQL provides cloud deployment. The schema is relational, with foreign keys across users, customers, orders, inventory, and shipping rates, utilizing enums for roles/statuses and numeric types for currency.

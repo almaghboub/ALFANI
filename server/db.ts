@@ -933,6 +933,64 @@ async function migrateProductsTable() {
       `);
     }
 
+    // === Database integrity constraints ===
+    const constraintQueries = [
+      `DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_invoice_items_quantity_positive') THEN
+          ALTER TABLE invoice_items ADD CONSTRAINT chk_invoice_items_quantity_positive CHECK (quantity > 0);
+        END IF;
+      END $$`,
+      `DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_invoice_items_line_total_non_negative') THEN
+          ALTER TABLE invoice_items ADD CONSTRAINT chk_invoice_items_line_total_non_negative CHECK (line_total >= 0);
+        END IF;
+      END $$`,
+      `DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_branch_inventory_quantity_non_negative') THEN
+          ALTER TABLE branch_inventory ADD CONSTRAINT chk_branch_inventory_quantity_non_negative CHECK (quantity >= 0);
+        END IF;
+      END $$`,
+    ];
+    for (const q of constraintQueries) {
+      try { await pool.query(q); } catch (e) { /* constraint may conflict with existing data */ }
+    }
+
+    // Idempotency keys table for deduplication
+    const idempotencyExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'idempotency_keys'
+    `);
+    if (idempotencyExists.rows.length === 0) {
+      console.log("Migrating: creating idempotency_keys table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS idempotency_keys (
+          key TEXT PRIMARY KEY,
+          response JSONB,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // Operation log table for audit trail
+    const opLogExists = await pool.query(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'operation_log'
+    `);
+    if (opLogExists.rows.length === 0) {
+      console.log("Migrating: creating operation_log table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS operation_log (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          operation TEXT NOT NULL,
+          invoice_id VARCHAR,
+          product_id VARCHAR,
+          quantity INTEGER,
+          details JSONB,
+          error TEXT,
+          created_by VARCHAR,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
     // Enable pg_trgm for fast text search on 100k+ products
     try {
       await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
@@ -950,6 +1008,9 @@ async function migrateProductsTable() {
       `CREATE INDEX IF NOT EXISTS idx_products_name_trgm ON products USING gin (name gin_trgm_ops)`,
       `CREATE INDEX IF NOT EXISTS idx_products_sku_trgm ON products USING gin (sku gin_trgm_ops)`,
       `CREATE INDEX IF NOT EXISTS idx_products_category_trgm ON products USING gin (category gin_trgm_ops)`,
+      `CREATE INDEX IF NOT EXISTS idx_operation_log_invoice_id ON operation_log (invoice_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_operation_log_created_at ON operation_log (created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_idempotency_keys_created_at ON idempotency_keys (created_at)`,
     ];
     for (const q of indexQueries) {
       try { await pool.query(q); } catch (e) { /* index may already exist */ }

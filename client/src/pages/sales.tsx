@@ -146,7 +146,20 @@ export default function Sales() {
 
   const returnMutation = useMutation({
     mutationFn: async ({ id, returnItems }: { id: string; returnItems: Array<{itemId: string; quantity: number}> }) => {
-      const res = await apiRequest("POST", `/api/invoices/${id}/return`, { returnItems });
+      const idempotencyKey = `ret-${id}-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+      const res = await fetch(`/api/invoices/${id}/return`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({ returnItems }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.message || `Error ${res.status}`);
+      }
       return res.json();
     },
     onSuccess: () => {

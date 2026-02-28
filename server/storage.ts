@@ -2257,30 +2257,37 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async createInvoice(invoice: InsertSalesInvoice, items: InsertInvoiceItem[], itemBranches?: string[]): Promise<SalesInvoiceWithItems> {
-    const invoiceResult = await db.insert(salesInvoices).values(invoice).returning();
-    const createdInvoice = invoiceResult[0];
-    
-    const itemsWithInvoiceId = items.map(item => ({
-      ...item,
-      invoiceId: createdInvoice.id,
-    }));
-    
-    const createdItems = await db.insert(invoiceItems).values(itemsWithInvoiceId).returning();
-    
-    for (let i = 0; i < items.length; i++) {
-      const itemBranch = itemBranches?.[i] || invoice.branch;
-      const inv = await db.select().from(branchInventory)
-        .where(sql`${branchInventory.productId} = ${items[i].productId} AND ${branchInventory.branch} = ${itemBranch}`);
-      
-      if (inv.length > 0) {
-        const newQty = Math.max(0, inv[0].quantity - items[i].quantity);
-        await db.update(branchInventory)
-          .set({ quantity: newQty, updatedAt: new Date() })
-          .where(eq(branchInventory.id, inv[0].id));
+    return await db.transaction(async (tx) => {
+      const invoiceResult = await tx.insert(salesInvoices).values(invoice).returning();
+      const createdInvoice = invoiceResult[0];
+
+      const itemsWithInvoiceId = items.map(item => ({
+        ...item,
+        invoiceId: createdInvoice.id,
+      }));
+
+      const createdItems = await tx.insert(invoiceItems).values(itemsWithInvoiceId).returning();
+
+      for (let i = 0; i < items.length; i++) {
+        const itemBranch = itemBranches?.[i] || invoice.branch;
+        const inv = await tx.execute(
+          sql`SELECT * FROM branch_inventory WHERE product_id = ${items[i].productId} AND branch = ${itemBranch} FOR UPDATE`
+        );
+
+        if (inv.rows && inv.rows.length > 0) {
+          const row = inv.rows[0] as any;
+          const currentQty = Number(row.quantity);
+          if (currentQty < items[i].quantity) {
+            throw new Error(`Insufficient stock for ${items[i].productName}: available ${currentQty}, requested ${items[i].quantity}`);
+          }
+          await tx.execute(
+            sql`UPDATE branch_inventory SET quantity = quantity - ${items[i].quantity}, updated_at = NOW() WHERE id = ${row.id}`
+          );
+        }
       }
-    }
-    
-    return { ...createdInvoice, items: createdItems };
+
+      return { ...createdInvoice, items: createdItems };
+    });
   }
 
   async generateInvoiceNumber(): Promise<string> {
@@ -2295,111 +2302,120 @@ export class PostgreSQLStorage implements IStorage {
   }
   
   async updateInvoice(id: string, invoiceData: Partial<InsertSalesInvoice>, newItems?: InsertInvoiceItem[]): Promise<SalesInvoiceWithItems | undefined> {
-    const existing = await db.select().from(salesInvoices).where(eq(salesInvoices.id, id));
-    if (existing.length === 0) return undefined;
+    return await db.transaction(async (tx) => {
+      const existing = await tx.select().from(salesInvoices).where(eq(salesInvoices.id, id));
+      if (existing.length === 0) return undefined;
 
-    const oldInvoice = existing[0];
+      const oldInvoice = existing[0];
 
-    if (newItems && newItems.length > 0) {
-      const oldItems = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
-      for (const oldItem of oldItems) {
-        const inv = await db.select().from(branchInventory)
-          .where(sql`${branchInventory.productId} = ${oldItem.productId} AND ${branchInventory.branch} = ${oldInvoice.branch}`);
-        if (inv.length > 0) {
-          await db.update(branchInventory)
-            .set({ quantity: inv[0].quantity + oldItem.quantity, updatedAt: new Date() })
-            .where(eq(branchInventory.id, inv[0].id));
+      if (newItems && newItems.length > 0) {
+        const oldItems = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+        for (const oldItem of oldItems) {
+          await tx.execute(
+            sql`UPDATE branch_inventory SET quantity = quantity + ${oldItem.quantity}, updated_at = NOW()
+                WHERE product_id = ${oldItem.productId} AND branch = ${oldInvoice.branch}`
+          );
+        }
+
+        await tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+
+        const branch = invoiceData.branch || oldInvoice.branch;
+        const itemsWithId = newItems.map(item => ({ ...item, invoiceId: id }));
+        await tx.insert(invoiceItems).values(itemsWithId).returning();
+
+        for (const item of newItems) {
+          const inv = await tx.execute(
+            sql`SELECT * FROM branch_inventory WHERE product_id = ${item.productId} AND branch = ${branch} FOR UPDATE`
+          );
+          if (inv.rows && inv.rows.length > 0) {
+            const row = inv.rows[0] as any;
+            const currentQty = Number(row.quantity);
+            if (currentQty < item.quantity) {
+              throw new Error(`Insufficient stock for ${item.productName}: available ${currentQty}, requested ${item.quantity}`);
+            }
+            await tx.execute(
+              sql`UPDATE branch_inventory SET quantity = quantity - ${item.quantity}, updated_at = NOW() WHERE id = ${row.id}`
+            );
+          }
         }
       }
 
-      await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
-
-      const branch = invoiceData.branch || oldInvoice.branch;
-      const itemsWithId = newItems.map(item => ({ ...item, invoiceId: id }));
-      const createdItems = await db.insert(invoiceItems).values(itemsWithId).returning();
-
-      for (const item of newItems) {
-        const inv = await db.select().from(branchInventory)
-          .where(sql`${branchInventory.productId} = ${item.productId} AND ${branchInventory.branch} = ${branch}`);
-        if (inv.length > 0) {
-          const newQty = Math.max(0, inv[0].quantity - item.quantity);
-          await db.update(branchInventory)
-            .set({ quantity: newQty, updatedAt: new Date() })
-            .where(eq(branchInventory.id, inv[0].id));
-        }
-      }
-    }
-
-    const [updated] = await db.update(salesInvoices).set(invoiceData).where(eq(salesInvoices.id, id)).returning();
-    const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
-    return { ...updated, items };
+      const [updated] = await tx.update(salesInvoices).set(invoiceData).where(eq(salesInvoices.id, id)).returning();
+      const items = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+      return { ...updated, items };
+    });
   }
 
   async deleteInvoice(id: string): Promise<boolean> {
-    const existing = await db.select().from(salesInvoices).where(eq(salesInvoices.id, id));
-    if (existing.length === 0) return false;
+    return await db.transaction(async (tx) => {
+      const existing = await tx.select().from(salesInvoices).where(eq(salesInvoices.id, id));
+      if (existing.length === 0) return false;
 
-    const invoice = existing[0];
-    const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+      const invoice = existing[0];
+      const items = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
 
-    for (const item of items) {
-      const inv = await db.select().from(branchInventory)
-        .where(sql`${branchInventory.productId} = ${item.productId} AND ${branchInventory.branch} = ${invoice.branch}`);
-      if (inv.length > 0) {
-        await db.update(branchInventory)
-          .set({ quantity: inv[0].quantity + item.quantity, updatedAt: new Date() })
-          .where(eq(branchInventory.id, inv[0].id));
+      for (const item of items) {
+        await tx.execute(
+          sql`UPDATE branch_inventory SET quantity = quantity + ${item.quantity}, updated_at = NOW()
+              WHERE product_id = ${item.productId} AND branch = ${invoice.branch}`
+        );
       }
-    }
 
-    await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
-    await db.delete(salesInvoices).where(eq(salesInvoices.id, id));
-    return true;
+      await tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+      await tx.delete(salesInvoices).where(eq(salesInvoices.id, id));
+      return true;
+    });
   }
 
   async returnInvoiceItems(invoiceId: string, returnItems: Array<{itemId: string; quantity: number}>): Promise<SalesInvoiceWithItems | undefined> {
-    const existing = await db.select().from(salesInvoices).where(eq(salesInvoices.id, invoiceId));
-    if (existing.length === 0) return undefined;
+    return await db.transaction(async (tx) => {
+      const existing = await tx.select().from(salesInvoices).where(eq(salesInvoices.id, invoiceId));
+      if (existing.length === 0) return undefined;
 
-    const invoice = existing[0];
+      const invoice = existing[0];
 
-    for (const ret of returnItems) {
-      const [item] = await db.select().from(invoiceItems).where(eq(invoiceItems.id, ret.itemId));
-      if (!item) continue;
+      for (const ret of returnItems) {
+        const lockedItems = await tx.execute(
+          sql`SELECT * FROM invoice_items WHERE id = ${ret.itemId} FOR UPDATE`
+        );
+        if (!lockedItems.rows || lockedItems.rows.length === 0) continue;
+        const item = lockedItems.rows[0] as any;
 
-      if (ret.quantity >= item.quantity) {
-        await db.delete(invoiceItems).where(eq(invoiceItems.id, ret.itemId));
-      } else {
-        const newQty = item.quantity - ret.quantity;
-        const newLineTotal = newQty * Number(item.unitPrice);
-        await db.update(invoiceItems)
-          .set({ quantity: newQty, lineTotal: String(newLineTotal) })
-          .where(eq(invoiceItems.id, ret.itemId));
+        if (ret.quantity > Number(item.quantity)) {
+          throw new Error(`Return quantity (${ret.quantity}) exceeds item quantity (${item.quantity}) for ${item.product_name}`);
+        }
+
+        if (ret.quantity >= Number(item.quantity)) {
+          await tx.execute(sql`DELETE FROM invoice_items WHERE id = ${ret.itemId}`);
+        } else {
+          const newQty = Number(item.quantity) - ret.quantity;
+          const newLineTotal = newQty * Number(item.unit_price);
+          await tx.execute(
+            sql`UPDATE invoice_items SET quantity = ${newQty}, line_total = ${String(newLineTotal)} WHERE id = ${ret.itemId}`
+          );
+        }
+
+        await tx.execute(
+          sql`UPDATE branch_inventory SET quantity = quantity + ${ret.quantity}, updated_at = NOW()
+              WHERE product_id = ${item.product_id} AND branch = ${invoice.branch}`
+        );
       }
 
-      const inv = await db.select().from(branchInventory)
-        .where(sql`${branchInventory.productId} = ${item.productId} AND ${branchInventory.branch} = ${invoice.branch}`);
-      if (inv.length > 0) {
-        await db.update(branchInventory)
-          .set({ quantity: inv[0].quantity + ret.quantity, updatedAt: new Date() })
-          .where(eq(branchInventory.id, inv[0].id));
+      const remainingItems = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
+
+      if (remainingItems.length === 0) {
+        await tx.delete(salesInvoices).where(eq(salesInvoices.id, invoiceId));
+        return undefined;
       }
-    }
 
-    const remainingItems = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoiceId));
-    
-    if (remainingItems.length === 0) {
-      await db.delete(salesInvoices).where(eq(salesInvoices.id, invoiceId));
-      return undefined;
-    }
+      const newTotal = remainingItems.reduce((sum, item) => sum + Number(item.lineTotal), 0);
+      const [updated] = await tx.update(salesInvoices)
+        .set({ totalAmount: String(newTotal) })
+        .where(eq(salesInvoices.id, invoiceId))
+        .returning();
 
-    const newTotal = remainingItems.reduce((sum, item) => sum + Number(item.lineTotal), 0);
-    const [updated] = await db.update(salesInvoices)
-      .set({ totalAmount: String(newTotal) })
-      .where(eq(salesInvoices.id, invoiceId))
-      .returning();
-
-    return { ...updated, items: remainingItems };
+      return { ...updated, items: remainingItems };
+    });
   }
 
   async checkInvoiceStock(branch: string, items: Array<{productId: string; quantity: number}>): Promise<{success: boolean; message?: string}> {
