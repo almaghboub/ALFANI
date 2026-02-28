@@ -1981,7 +1981,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const safe = await storage.createSafe(result.data);
       res.status(201).json(safe);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Failed to create safe:", error?.message || error);
+      if (error?.message?.includes("unique") || error?.message?.includes("duplicate") || error?.code === '23505') {
+        return res.status(400).json({ message: "A safe with this code already exists" });
+      }
       res.status(500).json({ message: "Failed to create safe" });
     }
   });
