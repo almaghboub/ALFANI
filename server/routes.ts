@@ -1975,14 +1975,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/safes", requireOwner, async (req, res) => {
     try {
-      const result = insertSafeSchema.safeParse(req.body);
+      const body = { ...req.body };
+      if (body.parentSafeId && body.parentSafeId !== "none") {
+        body.parentId = body.parentSafeId;
+      }
+      delete body.parentSafeId;
+      if (body.parentId === "none" || body.parentId === "") {
+        delete body.parentId;
+      }
+      const result = insertSafeSchema.safeParse(body);
       if (!result.success) {
+        console.error("Safe validation failed:", JSON.stringify(result.error.errors));
         return res.status(400).json({ message: "Invalid safe data", errors: result.error.errors });
       }
       const safe = await storage.createSafe(result.data);
       res.status(201).json(safe);
     } catch (error: any) {
-      console.error("Failed to create safe:", error?.message || error);
+      console.error("Failed to create safe:", error?.message || error, error?.code);
       if (error?.message?.includes("unique") || error?.message?.includes("duplicate") || error?.code === '23505') {
         return res.status(400).json({ message: "A safe with this code already exists" });
       }

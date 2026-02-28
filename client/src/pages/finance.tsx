@@ -207,8 +207,13 @@ export default function Finance() {
       setNewSafeDialogOpen(false);
       toast({ title: t("safeCreated") || "Safe created successfully" });
     },
-    onError: () => {
-      toast({ title: t("error") || "Error", description: t("failedToCreateSafe") || "Failed to create safe", variant: "destructive" });
+    onError: (error: any) => {
+      let msg = t("failedToCreateSafe") || "Failed to create safe";
+      try {
+        const parsed = JSON.parse(error?.message?.split(": ").slice(1).join(": ") || "{}");
+        if (parsed.message) msg = parsed.message;
+      } catch {}
+      toast({ title: t("error") || "Error", description: msg, variant: "destructive" });
     },
   });
 
