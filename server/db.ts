@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "@shared/schema";
 import { sql } from "drizzle-orm";
-import { scrypt, randomBytes } from "crypto";
+import { hashPassword, verifyPassword } from "./auth";
 
 const { Pool } = pg;
 
@@ -26,31 +26,27 @@ export const pool = new Pool({
 });
 export const db = drizzle(pool, { schema });
 
-async function hashAdminPassword(): Promise<string> {
-  const salt = randomBytes(16).toString("hex");
-  const derivedKey = await new Promise<Buffer>((resolve, reject) => {
-    scrypt("admin", salt, 64, (err, key) => {
-      if (err) reject(err);
-      else resolve(key);
-    });
-  });
-  return `${salt}:${derivedKey.toString("hex")}`;
-}
-
 async function ensureAdminUser() {
   try {
-    const adminCheck = await pool.query(`SELECT id FROM users WHERE username = 'admin'`);
-    const hashedPassword = await hashAdminPassword();
+    const adminCheck = await pool.query(`SELECT id, password FROM users WHERE username = 'admin'`);
     if (adminCheck.rows.length === 0) {
+      const hashedPassword = await hashPassword("admin");
       await pool.query(
         `INSERT INTO users (username, password, role, first_name, last_name, email, is_active)
-         VALUES ('admin', $1, 'owner', 'Admin', 'User', 'admin@lynxly.com', true)`,
+         VALUES ('admin', $1, 'owner', 'Admin', 'User', 'admin@alfani.com', true)`,
         [hashedPassword]
       );
       console.log("Default admin user created successfully.");
     } else {
-      await pool.query(`UPDATE users SET password = $1 WHERE username = 'admin'`, [hashedPassword]);
-      console.log("Admin user password verified and updated.");
+      const currentHash = adminCheck.rows[0].password;
+      const isValid = await verifyPassword("admin", currentHash);
+      if (!isValid) {
+        const hashedPassword = await hashPassword("admin");
+        await pool.query(`UPDATE users SET password = $1 WHERE username = 'admin'`, [hashedPassword]);
+        console.log("Admin user password reset to default.");
+      } else {
+        console.log("Admin user exists and password is valid.");
+      }
     }
   } catch (error) {
     console.error("Error ensuring admin user:", error);
