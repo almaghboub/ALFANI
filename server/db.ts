@@ -18,11 +18,16 @@ const isExternalDb = dbUrl.includes("render.com") || dbUrl.includes("neon.tech")
 export const pool = new Pool({
   connectionString: dbUrl,
   ssl: isExternalDb ? { rejectUnauthorized: false } : undefined,
-  max: 20,
-  min: 5,
-  idleTimeoutMillis: 30000,
+  max: 10,
+  min: 1,
+  idleTimeoutMillis: 10000,
   connectionTimeoutMillis: 10000,
   statement_timeout: 15000,
+  allowExitOnIdle: true,
+});
+
+pool.on('error', (err) => {
+  console.error('Database pool error:', err.message);
 });
 export const db = drizzle(pool, { schema });
 
