@@ -29,8 +29,8 @@ export const db = drizzle(pool, { schema });
 async function ensureAdminUser() {
   try {
     const adminCheck = await pool.query(`SELECT id, password FROM users WHERE username = 'admin'`);
+    const hashedPassword = await hashPassword("admin");
     if (adminCheck.rows.length === 0) {
-      const hashedPassword = await hashPassword("admin");
       await pool.query(
         `INSERT INTO users (username, password, role, first_name, last_name, email, is_active)
          VALUES ('admin', $1, 'owner', 'Admin', 'User', 'admin@alfani.com', true)`,
@@ -38,15 +38,8 @@ async function ensureAdminUser() {
       );
       console.log("Default admin user created successfully.");
     } else {
-      const currentHash = adminCheck.rows[0].password;
-      const isValid = await verifyPassword("admin", currentHash);
-      if (!isValid) {
-        const hashedPassword = await hashPassword("admin");
-        await pool.query(`UPDATE users SET password = $1 WHERE username = 'admin'`, [hashedPassword]);
-        console.log("Admin user password reset to default.");
-      } else {
-        console.log("Admin user exists and password is valid.");
-      }
+      await pool.query(`UPDATE users SET password = $1 WHERE username = 'admin'`, [hashedPassword]);
+      console.log("Admin user password has been reset.");
     }
   } catch (error) {
     console.error("Error ensuring admin user:", error);
