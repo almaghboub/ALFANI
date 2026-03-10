@@ -128,9 +128,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(
     session({
       store: new PgStore({
-        conString: isProduction
-          ? `${process.env.DATABASE_URL}?sslmode=require`
-          : process.env.DATABASE_URL,
+        conString: (() => {
+          const dbUrl = process.env.DATABASE_URL || '';
+          if (!isProduction) return dbUrl;
+          if (dbUrl.includes('sslmode=')) return dbUrl;
+          return dbUrl.includes('?') ? `${dbUrl}&sslmode=require` : `${dbUrl}?sslmode=require`;
+        })(),
         tableName: 'session',
         createTableIfMissing: true,
       }),
@@ -209,6 +212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Authentication routes
   app.post("/api/auth/login", (req, res, next) => {
+    console.log("Login attempt:", req.body?.username, "secure:", req.secure, "protocol:", req.protocol, "x-forwarded-proto:", req.headers['x-forwarded-proto']);
     const result = loginSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ message: "Invalid credentials format" });
@@ -216,21 +220,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
+        console.error("Login passport error:", err);
         return next(err);
       }
       if (!user) {
+        console.log("Login failed:", info?.message);
         return res.status(401).json({ message: info.message || "Authentication failed" });
       }
       req.logIn(user, (err) => {
         if (err) {
+          console.error("Login req.logIn error:", err);
           return next(err);
         }
-        // Explicitly save session before responding
         req.session.save((saveErr) => {
           if (saveErr) {
             console.error("Session save error:", saveErr);
             return next(saveErr);
           }
+          console.log("Login success:", user.username, "session:", req.sessionID);
           res.json({ user });
         });
       });
