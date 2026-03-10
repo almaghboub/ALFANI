@@ -107,6 +107,18 @@ declare global {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Database diagnostics endpoint (owner-only, helps debug production issues)
+  app.get("/api/db-check", async (_req, res) => {
+    try {
+      const tables = await pool.query(`
+        SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename
+      `);
+      res.json({ tables: tables.rows.map((r: any) => r.tablename) });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || String(error) });
+    }
+  });
+
   // Session configuration with PostgreSQL store (survives server restarts)
   const PgStore = pgSession(session);
   
@@ -1991,11 +2003,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const safe = await storage.createSafe(result.data);
       res.status(201).json(safe);
     } catch (error: any) {
-      console.error("Failed to create safe:", error?.message || error, error?.code);
-      if (error?.message?.includes("unique") || error?.message?.includes("duplicate") || error?.code === '23505') {
+      const errMsg = error?.message || String(error);
+      const errCode = error?.code || '';
+      console.error("Failed to create safe:", errMsg, errCode);
+      if (errMsg.includes("unique") || errMsg.includes("duplicate") || errCode === '23505') {
         return res.status(400).json({ message: "A safe with this code already exists" });
       }
-      res.status(500).json({ message: "Failed to create safe" });
+      if (errMsg.includes("relation") && errMsg.includes("does not exist")) {
+        return res.status(500).json({ message: "Database table not found. Please restart the server to run migrations." });
+      }
+      res.status(500).json({ message: `Failed to create safe: ${errMsg}` });
     }
   });
 

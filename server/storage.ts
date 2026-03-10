@@ -106,7 +106,7 @@ import {
 import { randomUUID } from "crypto";
 import { hashPassword } from "./auth";
 import { eq, desc, sql, or, ilike, and, count } from "drizzle-orm";
-import { db } from "./db";
+import { db, pool } from "./db";
 
 export interface IStorage {
   // Users
@@ -1601,8 +1601,32 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async createSafe(safe: InsertSafe): Promise<Safe> {
-    const result = await db.insert(safes).values(safe).returning();
-    return result[0];
+    try {
+      const result = await db.insert(safes).values(safe).returning();
+      return result[0];
+    } catch (error: any) {
+      if (error?.message?.includes("relation") && error?.message?.includes("does not exist")) {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS safes (
+            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT NOT NULL,
+            code TEXT NOT NULL UNIQUE,
+            parent_id VARCHAR REFERENCES safes(id),
+            currency TEXT NOT NULL DEFAULT 'USD',
+            is_multi_currency BOOLEAN NOT NULL DEFAULT false,
+            balance_usd DECIMAL(15,2) NOT NULL DEFAULT 0,
+            balance_lyd DECIMAL(15,2) NOT NULL DEFAULT 0,
+            description TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT true,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+          )
+        `);
+        const result = await db.insert(safes).values(safe).returning();
+        return result[0];
+      }
+      throw error;
+    }
   }
 
   async updateSafe(id: string, safe: Partial<InsertSafe>): Promise<Safe | undefined> {
