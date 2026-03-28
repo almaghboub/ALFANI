@@ -675,7 +675,9 @@ export default function Sales() {
     }
   };
 
-  const totalSales = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
+  // Product sales excludes service fees (service fees are pass-through collected for service providers)
+  const totalSales = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount) - (Number(inv.serviceAmount) || 0), 0);
+  const totalServiceFees = invoices.reduce((sum, inv) => sum + (Number(inv.serviceAmount) || 0), 0);
   const totalItems = invoices.reduce((sum, inv) => sum + inv.items.reduce((s, i) => s + i.quantity, 0), 0);
 
   return (
@@ -684,7 +686,7 @@ export default function Sales() {
       
       <div className="p-6 space-y-6">
         {isOwner && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">{t("totalInvoices")}</CardTitle>
@@ -699,8 +701,20 @@ export default function Sales() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalSales.toFixed(2)} LYD</div>
+              <div className="text-xs text-muted-foreground mt-1">{t("productsOnly") || "Products only"}</div>
             </CardContent>
           </Card>
+          {totalServiceFees > 0 && (
+          <Card className="border-blue-200 dark:border-blue-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-blue-600 dark:text-blue-400">{t("serviceFee")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalServiceFees.toFixed(2)} LYD</div>
+              <div className="text-xs text-muted-foreground mt-1">{t("notIncludedInProfit") || "Not included in profit"}</div>
+            </CardContent>
+          </Card>
+          )}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">{t("itemsSold")}</CardTitle>

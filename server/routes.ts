@@ -2561,7 +2561,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? userInvoices.filter(inv => inv.branch === branch)
         : userInvoices;
       
-      const totalSales = filteredInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
+      // Product sales = totalAmount minus service fees (service fees are pass-through, not revenue)
+      const productSales = (inv: any) => Number(inv.totalAmount) - (Number(inv.serviceAmount) || 0);
+      const totalSales = filteredInvoices.reduce((sum, inv) => sum + productSales(inv), 0);
+      const totalServiceFees = filteredInvoices.reduce((sum, inv) => sum + (Number(inv.serviceAmount) || 0), 0);
       const totalItems = filteredInvoices.reduce((sum, inv) => 
         sum + inv.items.reduce((s, i) => s + i.quantity, 0), 0);
       const invoiceCount = filteredInvoices.length;
@@ -2569,13 +2572,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const byBranch = {
         ALFANI1: {
-          sales: userInvoices.filter(i => i.branch === 'ALFANI1').reduce((s, i) => s + Number(i.totalAmount), 0),
+          sales: userInvoices.filter(i => i.branch === 'ALFANI1').reduce((s, i) => s + productSales(i), 0),
+          serviceFees: userInvoices.filter(i => i.branch === 'ALFANI1').reduce((s, i) => s + (Number(i.serviceAmount) || 0), 0),
           count: userInvoices.filter(i => i.branch === 'ALFANI1').length,
           items: userInvoices.filter(i => i.branch === 'ALFANI1').reduce((s, inv) => 
             s + inv.items.reduce((is, item) => is + item.quantity, 0), 0),
         },
         ALFANI2: {
-          sales: userInvoices.filter(i => i.branch === 'ALFANI2').reduce((s, i) => s + Number(i.totalAmount), 0),
+          sales: userInvoices.filter(i => i.branch === 'ALFANI2').reduce((s, i) => s + productSales(i), 0),
+          serviceFees: userInvoices.filter(i => i.branch === 'ALFANI2').reduce((s, i) => s + (Number(i.serviceAmount) || 0), 0),
           count: userInvoices.filter(i => i.branch === 'ALFANI2').length,
           items: userInvoices.filter(i => i.branch === 'ALFANI2').reduce((s, inv) => 
             s + inv.items.reduce((is, item) => is + item.quantity, 0), 0),
@@ -2585,6 +2590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isOwner = user.role === 'owner';
       res.json({
         totalSales: isOwner ? totalSales : 0,
+        totalServiceFees: isOwner ? totalServiceFees : 0,
         totalItems: isOwner ? totalItems : 0,
         invoiceCount: isOwner ? invoiceCount : 0,
         avgOrderValue: isOwner ? avgOrderValue : 0,

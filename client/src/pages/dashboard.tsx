@@ -102,7 +102,7 @@ export default function Dashboard() {
         const invDate = new Date(inv.createdAt);
         return isWithinInterval(invDate, { start: monthStart, end: monthEnd });
       })
-      .reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
+      .reduce((sum, inv) => sum + Number(inv.totalAmount) - (Number(inv.serviceAmount) || 0), 0);
     salesData.push({
       month: format(monthDate, 'MMM'),
       sales: parseFloat(monthSales.toFixed(2))
