@@ -300,6 +300,8 @@ export default function Sales() {
     });
     const subtotal = invoice.items.reduce((s, i) => s + Number(i.lineTotal), 0);
     const totalQty = invoice.items.reduce((s, i) => s + i.quantity, 0);
+    const discountAmount = Number(invoice.discountAmount) || 0;
+    const serviceAmount = Number(invoice.serviceAmount) || 0;
 
     const printWindow = window.open('', '_blank');
     if (printWindow) {
@@ -628,6 +630,16 @@ export default function Sales() {
                     <span class="label">${t("subtotal")}</span>
                     <span class="value">${subtotal.toFixed(2)} LYD</span>
                   </div>
+                  ${discountAmount > 0 ? `
+                  <div class="totals-row" style="color:#16a34a;">
+                    <span class="label">${t("discount")}</span>
+                    <span class="value">- ${discountAmount.toFixed(2)} LYD</span>
+                  </div>` : ''}
+                  ${serviceAmount > 0 ? `
+                  <div class="totals-row" style="color:#2563eb;">
+                    <span class="label">${t("serviceFee")}</span>
+                    <span class="value">+ ${serviceAmount.toFixed(2)} LYD</span>
+                  </div>` : ''}
                   <div class="totals-row grand-total">
                     <span class="label">${t("total")}</span>
                     <span class="value">${Number(invoice.totalAmount).toFixed(2)} LYD</span>
@@ -832,9 +844,27 @@ export default function Sales() {
                 </Table>
               </div>
 
-              <div className="flex justify-between items-center pt-4 border-t">
-                <span className="text-lg font-semibold">{t("total")}</span>
-                <span className="text-2xl font-bold">{Number(selectedInvoice.totalAmount).toFixed(2)} LYD</span>
+              <div className="space-y-2 pt-4 border-t">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">{t("subtotal")}</span>
+                  <span>{selectedInvoice.items.reduce((s, i) => s + Number(i.lineTotal), 0).toFixed(2)} LYD</span>
+                </div>
+                {Number(selectedInvoice.discountAmount) > 0 && (
+                  <div className="flex justify-between items-center text-sm text-green-600">
+                    <span>{t("discount")}</span>
+                    <span>- {Number(selectedInvoice.discountAmount).toFixed(2)} LYD</span>
+                  </div>
+                )}
+                {Number(selectedInvoice.serviceAmount) > 0 && (
+                  <div className="flex justify-between items-center text-sm text-blue-600">
+                    <span>{t("serviceFee")}</span>
+                    <span>+ {Number(selectedInvoice.serviceAmount).toFixed(2)} LYD</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-2 border-t">
+                  <span className="text-lg font-semibold">{t("total")}</span>
+                  <span className="text-2xl font-bold">{Number(selectedInvoice.totalAmount).toFixed(2)} LYD</span>
+                </div>
               </div>
 
               <Button onClick={() => handlePrint(selectedInvoice)} className="w-full" data-testid="button-print-dialog">
