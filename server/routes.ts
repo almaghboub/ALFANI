@@ -2399,8 +2399,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const summary = await storage.getFinancialSummary();
       res.json(summary);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch financial summary" });
+    } catch (error: any) {
+      console.error("financial-summary error:", error?.message || error);
+      res.status(500).json({ message: "Failed to fetch financial summary", detail: error?.message });
     }
   });
 
@@ -2408,8 +2409,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const details = await storage.getGoodsCapitalDetails();
       res.json(details);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch goods capital details" });
+    } catch (error: any) {
+      console.error("goods-capital-details error:", error?.message || error);
+      res.status(500).json({ message: "Failed to fetch goods capital details", detail: error?.message });
     }
   });
 

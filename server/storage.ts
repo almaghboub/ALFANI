@@ -1964,9 +1964,15 @@ export class PostgreSQLStorage implements IStorage {
     }).from(suppliers);
 
     // Get goods capital (total inventory value = sum of cost_price * quantity for all products)
-    const goodsCapitalResult = await db.select({
-      totalLYD: sql<number>`COALESCE(SUM(bi.quantity * p.cost_price::numeric), 0)`,
-    }).from(sql`${branchInventory} bi INNER JOIN ${products} p ON p.id = bi.product_id WHERE bi.quantity > 0`);
+    const goodsCapitalRaw = await pool.query(`
+      SELECT COALESCE(SUM(bi.quantity * p.cost_price::numeric), 0) AS "totalLYD"
+      FROM branch_inventory bi
+      INNER JOIN products p ON p.id = bi.product_id
+      WHERE bi.quantity > 0
+        AND p.cost_price IS NOT NULL
+        AND p.cost_price > 0
+    `);
+    const goodsCapitalResult = [{ totalLYD: goodsCapitalRaw.rows[0]?.totalLYD ?? 0 }];
 
     // Get recent transactions from both safes and banks (last 10)
     const recentSafeTransactions = await db.select({
