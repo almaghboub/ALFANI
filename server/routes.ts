@@ -2551,8 +2551,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user as any;
       const branch = req.query.branch as string | undefined;
-      const allInvoices = await storage.getAllInvoices();
-      
+      const [allInvoices, allProducts] = await Promise.all([
+        storage.getAllInvoices(),
+        storage.getAllProducts(),
+      ]);
+
+      // Build a cost price map: productId -> costPrice
+      const costMap: Record<string, number> = {};
+      for (const p of allProducts) {
+        costMap[p.id] = parseFloat(p.costPrice || '0') || 0;
+      }
+
+      // Calculate cost of goods sold for a set of invoices
+      const calcCost = (invList: any[]) =>
+        invList.reduce((sum, inv) =>
+          sum + inv.items.reduce((s: number, item: any) =>
+            s + (costMap[item.productId] || 0) * item.quantity, 0), 0);
+
       const userInvoices = user.role === 'owner'
         ? allInvoices
         : allInvoices.filter(inv => inv.createdByUserId === user.id);
@@ -2565,31 +2580,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const productSales = (inv: any) => Number(inv.totalAmount) - (Number(inv.serviceAmount) || 0);
       const totalSales = filteredInvoices.reduce((sum, inv) => sum + productSales(inv), 0);
       const totalServiceFees = filteredInvoices.reduce((sum, inv) => sum + (Number(inv.serviceAmount) || 0), 0);
+      const totalCost = calcCost(filteredInvoices);
+      const totalProfit = totalSales - totalCost;
       const totalItems = filteredInvoices.reduce((sum, inv) => 
         sum + inv.items.reduce((s, i) => s + i.quantity, 0), 0);
       const invoiceCount = filteredInvoices.length;
       const avgOrderValue = invoiceCount > 0 ? totalSales / invoiceCount : 0;
+
+      const branch1 = userInvoices.filter(i => i.branch === 'ALFANI1');
+      const branch2 = userInvoices.filter(i => i.branch === 'ALFANI2');
       
       const byBranch = {
         ALFANI1: {
-          sales: userInvoices.filter(i => i.branch === 'ALFANI1').reduce((s, i) => s + productSales(i), 0),
-          serviceFees: userInvoices.filter(i => i.branch === 'ALFANI1').reduce((s, i) => s + (Number(i.serviceAmount) || 0), 0),
-          count: userInvoices.filter(i => i.branch === 'ALFANI1').length,
-          items: userInvoices.filter(i => i.branch === 'ALFANI1').reduce((s, inv) => 
-            s + inv.items.reduce((is, item) => is + item.quantity, 0), 0),
+          sales: branch1.reduce((s, i) => s + productSales(i), 0),
+          cost: calcCost(branch1),
+          profit: branch1.reduce((s, i) => s + productSales(i), 0) - calcCost(branch1),
+          serviceFees: branch1.reduce((s, i) => s + (Number(i.serviceAmount) || 0), 0),
+          count: branch1.length,
+          items: branch1.reduce((s, inv) => s + inv.items.reduce((is, item) => is + item.quantity, 0), 0),
         },
         ALFANI2: {
-          sales: userInvoices.filter(i => i.branch === 'ALFANI2').reduce((s, i) => s + productSales(i), 0),
-          serviceFees: userInvoices.filter(i => i.branch === 'ALFANI2').reduce((s, i) => s + (Number(i.serviceAmount) || 0), 0),
-          count: userInvoices.filter(i => i.branch === 'ALFANI2').length,
-          items: userInvoices.filter(i => i.branch === 'ALFANI2').reduce((s, inv) => 
-            s + inv.items.reduce((is, item) => is + item.quantity, 0), 0),
+          sales: branch2.reduce((s, i) => s + productSales(i), 0),
+          cost: calcCost(branch2),
+          profit: branch2.reduce((s, i) => s + productSales(i), 0) - calcCost(branch2),
+          serviceFees: branch2.reduce((s, i) => s + (Number(i.serviceAmount) || 0), 0),
+          count: branch2.length,
+          items: branch2.reduce((s, inv) => s + inv.items.reduce((is, item) => is + item.quantity, 0), 0),
         },
       };
       
       const isOwner = user.role === 'owner';
       res.json({
         totalSales: isOwner ? totalSales : 0,
+        totalCost: isOwner ? totalCost : 0,
+        totalProfit: isOwner ? totalProfit : 0,
         totalServiceFees: isOwner ? totalServiceFees : 0,
         totalItems: isOwner ? totalItems : 0,
         invoiceCount: isOwner ? invoiceCount : 0,

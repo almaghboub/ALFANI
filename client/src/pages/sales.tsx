@@ -109,6 +109,18 @@ export default function Sales() {
     queryKey: ["/api/invoices"],
   });
 
+  const { data: invoiceMetrics } = useQuery<{
+    totalSales: number; totalCost: number; totalProfit: number;
+    totalServiceFees: number; invoiceCount: number;
+    byBranch: {
+      ALFANI1: { sales: number; cost: number; profit: number; count: number; items: number };
+      ALFANI2: { sales: number; cost: number; profit: number; count: number; items: number };
+    };
+  }>({
+    queryKey: ["/api/invoices/metrics"],
+    enabled: isOwner,
+  });
+
   const editMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       const res = await apiRequest("PUT", `/api/invoices/${id}`, data);
@@ -704,7 +716,8 @@ export default function Sales() {
       
       <div className="p-6 space-y-6">
         {isOwner && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">{t("totalInvoices")}</CardTitle>
@@ -718,30 +731,98 @@ export default function Sales() {
               <CardTitle className="text-sm font-medium text-muted-foreground">{t("totalSales")}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalSales.toFixed(2)} LYD</div>
-              <div className="text-xs text-muted-foreground mt-1">{t("productsOnly") || "Products only"}</div>
+              <div className="text-2xl font-bold">{(invoiceMetrics?.totalSales ?? totalSales).toFixed(2)} LYD</div>
+              <div className="text-xs text-muted-foreground mt-1">{t("productsOnly")}</div>
             </CardContent>
           </Card>
-          {totalServiceFees > 0 && (
-          <Card className="border-blue-200 dark:border-blue-800">
+          <Card className="border-orange-200 dark:border-orange-800">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-blue-600 dark:text-blue-400">{t("serviceFee")}</CardTitle>
+              <CardTitle className="text-sm font-medium text-orange-600 dark:text-orange-400">{t("totalCost")}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalServiceFees.toFixed(2)} LYD</div>
-              <div className="text-xs text-muted-foreground mt-1">{t("notIncludedInProfit") || "Not included in profit"}</div>
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                {(invoiceMetrics?.totalCost ?? 0).toFixed(2)} LYD
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">{t("costPrice")}</div>
             </CardContent>
           </Card>
-          )}
-          <Card>
+          <Card className="border-green-200 dark:border-green-800">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{t("itemsSold")}</CardTitle>
+              <CardTitle className="text-sm font-medium text-green-600 dark:text-green-400">{t("totalProfit")}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalItems}</div>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {(invoiceMetrics?.totalProfit ?? 0).toFixed(2)} LYD
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">{t("itemsSold")}: {totalItems}</div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Per-branch cost breakdown */}
+        {invoiceMetrics?.byBranch && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="overflow-hidden relative border-border/50">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-blue-600" />
+            <CardHeader className="pb-3 pt-5">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <div className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
+                ALFANI 1
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t("totalSales")}</p>
+                  <p className="text-base font-bold text-blue-700 dark:text-blue-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI1?.sales || 0).toFixed(2)} LYD</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t("costPrice")}</p>
+                  <p className="text-base font-bold text-orange-600 dark:text-orange-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI1?.cost || 0).toFixed(2)} LYD</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t("totalProfit")}</p>
+                  <p className="text-base font-bold text-green-700 dark:text-green-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI1?.profit || 0).toFixed(2)} LYD</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="overflow-hidden relative border-border/50">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-600" />
+            <CardHeader className="pb-3 pt-5">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
+                ALFANI 2
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t("totalSales")}</p>
+                  <p className="text-base font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI2?.sales || 0).toFixed(2)} LYD</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t("costPrice")}</p>
+                  <p className="text-base font-bold text-orange-600 dark:text-orange-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI2?.cost || 0).toFixed(2)} LYD</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t("totalProfit")}</p>
+                  <p className="text-base font-bold text-green-700 dark:text-green-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI2?.profit || 0).toFixed(2)} LYD</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        )}
+
+        {totalServiceFees > 0 && (
+        <div className="flex items-center gap-3 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/10">
+          <div className="text-sm font-medium text-blue-600 dark:text-blue-400">{t("serviceFee")}:</div>
+          <div className="text-sm font-bold text-blue-700 dark:text-blue-300">{totalServiceFees.toFixed(2)} LYD</div>
+          <div className="text-xs text-muted-foreground">— {t("notIncludedInProfit")}</div>
+        </div>
+        )}
+        </>
         )}
 
         {isOwner && (

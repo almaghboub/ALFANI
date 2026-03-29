@@ -13,12 +13,14 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 interface InvoiceMetrics {
   totalSales: number;
+  totalCost: number;
+  totalProfit: number;
   totalItems: number;
   invoiceCount: number;
   avgOrderValue: number;
   byBranch: {
-    ALFANI1: { sales: number; count: number; items: number };
-    ALFANI2: { sales: number; count: number; items: number };
+    ALFANI1: { sales: number; cost: number; profit: number; count: number; items: number };
+    ALFANI2: { sales: number; cost: number; profit: number; count: number; items: number };
   };
 }
 
@@ -280,18 +282,22 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pb-5">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('totalSales') || "Sales"}</p>
-                    <p className="text-lg font-bold text-blue-700 dark:text-blue-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI1?.sales || 0).toFixed(2)} LYD</p>
+                    <p className="text-base font-bold text-blue-700 dark:text-blue-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI1?.sales || 0).toFixed(2)} LYD</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('costPrice') || "Cost"}</p>
+                    <p className="text-base font-bold text-orange-600 dark:text-orange-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI1?.cost || 0).toFixed(2)} LYD</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('totalProfit') || "Profit"}</p>
+                    <p className="text-base font-bold text-green-700 dark:text-green-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI1?.profit || 0).toFixed(2)} LYD</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('totalInvoices') || "Invoices"}</p>
-                    <p className="text-lg font-bold text-foreground mt-0.5">{invoiceMetrics.byBranch.ALFANI1?.count || 0}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('itemsSold') || "Items"}</p>
-                    <p className="text-lg font-bold text-foreground mt-0.5">{invoiceMetrics.byBranch.ALFANI1?.items || 0}</p>
+                    <p className="text-base font-bold text-foreground mt-0.5">{invoiceMetrics.byBranch.ALFANI1?.count || 0}</p>
                   </div>
                 </div>
               </CardContent>
@@ -306,18 +312,22 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pb-5">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('totalSales') || "Sales"}</p>
-                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI2?.sales || 0).toFixed(2)} LYD</p>
+                    <p className="text-base font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI2?.sales || 0).toFixed(2)} LYD</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('costPrice') || "Cost"}</p>
+                    <p className="text-base font-bold text-orange-600 dark:text-orange-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI2?.cost || 0).toFixed(2)} LYD</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('totalProfit') || "Profit"}</p>
+                    <p className="text-base font-bold text-green-700 dark:text-green-400 mt-0.5">{(invoiceMetrics.byBranch.ALFANI2?.profit || 0).toFixed(2)} LYD</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('totalInvoices') || "Invoices"}</p>
-                    <p className="text-lg font-bold text-foreground mt-0.5">{invoiceMetrics.byBranch.ALFANI2?.count || 0}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{t('itemsSold') || "Items"}</p>
-                    <p className="text-lg font-bold text-foreground mt-0.5">{invoiceMetrics.byBranch.ALFANI2?.items || 0}</p>
+                    <p className="text-base font-bold text-foreground mt-0.5">{invoiceMetrics.byBranch.ALFANI2?.count || 0}</p>
                   </div>
                 </div>
               </CardContent>
