@@ -1,7 +1,8 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { History, Printer, Eye, Search, Pencil, Trash2, RotateCcw, Plus, Minus, X } from "lucide-react";
+import { History, Printer, Eye, Search, Pencil, Trash2, RotateCcw, Plus, Minus, X, Wrench, CalendarDays, TrendingUp } from "lucide-react";
+import { startOfDay, startOfWeek, startOfMonth, isAfter } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -680,6 +681,23 @@ export default function Sales() {
   const totalServiceFees = invoices.reduce((sum, inv) => sum + (Number(inv.serviceAmount) || 0), 0);
   const totalItems = invoices.reduce((sum, inv) => sum + inv.items.reduce((s, i) => s + i.quantity, 0), 0);
 
+  // Service fee period calculations
+  const now = new Date();
+  const todayStart = startOfDay(now);
+  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const monthStart = startOfMonth(now);
+
+  const invoicesWithFees = invoices.filter(inv => (Number(inv.serviceAmount) || 0) > 0);
+  const todayFees = invoicesWithFees
+    .filter(inv => isAfter(new Date(inv.createdAt), todayStart))
+    .reduce((sum, inv) => sum + (Number(inv.serviceAmount) || 0), 0);
+  const weekFees = invoicesWithFees
+    .filter(inv => isAfter(new Date(inv.createdAt), weekStart))
+    .reduce((sum, inv) => sum + (Number(inv.serviceAmount) || 0), 0);
+  const monthFees = invoicesWithFees
+    .filter(inv => isAfter(new Date(inv.createdAt), monthStart))
+    .reduce((sum, inv) => sum + (Number(inv.serviceAmount) || 0), 0);
+
   return (
     <div className="min-h-screen bg-background">
       <Header title={t("salesHistory")} description={t("viewAllInvoices")} />
@@ -724,6 +742,90 @@ export default function Sales() {
             </CardContent>
           </Card>
         </div>
+        )}
+
+        {isOwner && (
+        <Card className="border-blue-200 dark:border-blue-800">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/40">
+                <Wrench className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <CardTitle className="text-blue-700 dark:text-blue-300">{t("serviceFeeReport")}</CardTitle>
+                <CardDescription className="text-blue-600/70 dark:text-blue-400/70 text-xs mt-0.5">
+                  {t("serviceFeeReportDesc")}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Period summary cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <CalendarDays className="h-4 w-4 text-blue-500" />
+                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">{t("todayFees")}</span>
+                </div>
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{todayFees.toFixed(2)} LYD</div>
+                <div className="text-xs text-muted-foreground mt-1">{t("belongsToWorkers")}</div>
+              </div>
+              <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <CalendarDays className="h-4 w-4 text-blue-500" />
+                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">{t("thisWeekFees")}</span>
+                </div>
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{weekFees.toFixed(2)} LYD</div>
+                <div className="text-xs text-muted-foreground mt-1">{t("belongsToWorkers")}</div>
+              </div>
+              <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="h-4 w-4 text-blue-500" />
+                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">{t("thisMonthFees")}</span>
+                </div>
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{monthFees.toFixed(2)} LYD</div>
+                <div className="text-xs text-muted-foreground mt-1">{t("belongsToWorkers")}</div>
+              </div>
+            </div>
+
+            {/* Invoices with service fees */}
+            <div>
+              <p className="text-sm font-medium text-muted-foreground mb-2">{t("serviceFeeInvoices")}</p>
+              {invoicesWithFees.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic py-4 text-center">{t("noServiceFees")}</p>
+              ) : (
+                <div className="rounded-lg border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-blue-50 dark:bg-blue-900/20">
+                        <TableHead>{t("invoiceNumber")}</TableHead>
+                        <TableHead>{t("customer")}</TableHead>
+                        <TableHead>{t("branch")}</TableHead>
+                        <TableHead>{t("date")}</TableHead>
+                        <TableHead className="text-end">{t("serviceFee")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invoicesWithFees.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(inv => (
+                        <TableRow key={inv.id}>
+                          <TableCell className="font-mono text-sm">{inv.invoiceNumber}</TableCell>
+                          <TableCell>{inv.customerName}</TableCell>
+                          <TableCell><Badge variant="outline">{inv.branch}</Badge></TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {new Date(inv.createdAt).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-end font-bold text-blue-600 dark:text-blue-400">
+                            {Number(inv.serviceAmount).toFixed(2)} LYD
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
         )}
 
         <Card>
