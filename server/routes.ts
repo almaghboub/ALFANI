@@ -1466,6 +1466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         safeId: safeId || null,
         currency: currency || "USD",
         transactionType: transactionType || "outgoing",
+        date: expenseData.date ? new Date(expenseData.date) : new Date(),
       });
       if (!result.success) {
         return res.status(400).json({ message: "Invalid expense data", errors: result.error.errors });
