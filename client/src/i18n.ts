@@ -398,6 +398,7 @@ const resources = {
       // Customers Page
       customersDescription: "Manage customer information and relationships",
       searchCustomers: "Search customers...",
+      searchSuppliers: "Search suppliers...",
       filterByCountry: "Filter by Country",
       noCountriesAvailable: "No countries available",
       loadingCustomers: "Loading customers...",
@@ -1657,6 +1658,7 @@ const resources = {
       // Customers Page
       customersDescription: "إدارة معلومات وعلاقات العملاء",
       searchCustomers: "البحث عن العملاء...",
+      searchSuppliers: "البحث عن الموردين...",
       filterByCountry: "التصفية حسب الدولة",
       noCountriesAvailable: "لا توجد دول متاحة",
       loadingCustomers: "جاري تحميل العملاء...",

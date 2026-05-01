@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { DollarSign, Users, Building2, CreditCard, ChevronDown, ChevronUp } from "lucide-react";
+import { DollarSign, Users, Building2, CreditCard, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,8 @@ export default function Credits() {
   const [supplierPaymentDescription, setSupplierPaymentDescription] = useState("");
 
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [supplierSearch, setSupplierSearch] = useState("");
 
   const { data: summary } = useQuery<CreditSummary>({
     queryKey: ["/api/credit/summary"],
@@ -222,6 +224,18 @@ export default function Credits() {
           <CardTitle>{t("customerReceivables")}</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute ltr:left-3 rtl:right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={t("searchInvoices")}
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+                className="ltr:pl-10 rtl:pr-10"
+                data-testid="input-search-customer-receivables"
+              />
+            </div>
+          </div>
           {loadingInvoices ? (
             <div className="text-center py-8" data-testid="text-loading-invoices">{t("loading")}</div>
           ) : creditInvoices.length === 0 ? (
@@ -243,7 +257,10 @@ export default function Credits() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {creditInvoices.map((invoice) => (
+                  {creditInvoices.filter(inv =>
+                    inv.invoiceNumber.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                    inv.customerName.toLowerCase().includes(customerSearch.toLowerCase())
+                  ).map((invoice) => (
                     <>
                       <TableRow key={invoice.id} data-testid={`row-credit-invoice-${invoice.id}`} className="cursor-pointer" onClick={() => togglePaymentHistory(invoice.id)}>
                         <TableCell className="font-medium" data-testid={`text-invoice-number-${invoice.id}`}>
@@ -324,6 +341,18 @@ export default function Credits() {
           <CardTitle>{t("supplierPayables")}</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute ltr:left-3 rtl:right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={t("searchSuppliers")}
+                value={supplierSearch}
+                onChange={(e) => setSupplierSearch(e.target.value)}
+                className="ltr:pl-10 rtl:pr-10"
+                data-testid="input-search-supplier-debts"
+              />
+            </div>
+          </div>
           {loadingSuppliers ? (
             <div className="text-center py-8" data-testid="text-loading-suppliers">{t("loading")}</div>
           ) : supplierDebts.length === 0 ? (
@@ -342,7 +371,10 @@ export default function Credits() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {supplierDebts.map((supplier) => (
+                  {supplierDebts.filter(s =>
+                    s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+                    (s.code ?? "").toLowerCase().includes(supplierSearch.toLowerCase())
+                  ).map((supplier) => (
                     <TableRow key={supplier.id} data-testid={`row-supplier-debt-${supplier.id}`}>
                       <TableCell className="font-medium" data-testid={`text-supplier-name-${supplier.id}`}>{supplier.name}</TableCell>
                       <TableCell data-testid={`text-supplier-code-${supplier.id}`}>{supplier.code}</TableCell>
