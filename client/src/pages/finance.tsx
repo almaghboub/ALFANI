@@ -13,9 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Wallet, Building2, Landmark, Warehouse, Users, Receipt, BookOpen, Package,
+  Wallet, Landmark, Receipt, Package,
   Plus, ArrowUpRight, ArrowDownLeft, RefreshCw, TrendingUp, TrendingDown,
-  DollarSign, Banknote, Scale, UserCircle, History, Search, ShoppingCart, RotateCcw
+  DollarSign, Banknote, Scale, UserCircle, History, Search, Trash2, AlertTriangle, ChevronDown, ChevronRight
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -104,6 +104,7 @@ export default function Finance() {
   const [capitalTxDialogOpen, setCapitalTxDialogOpen] = useState(false);
   const [selectedOwnerAccount, setSelectedOwnerAccount] = useState<string>("");
   const [transactionSearchQuery, setTransactionSearchQuery] = useState("");
+  const [expandedPartner, setExpandedPartner] = useState<string | null>(null);
 
   const { data: summary, isLoading: summaryLoading } = useQuery<FinancialSummary>({
     queryKey: ["/api/financial-summary"],
@@ -117,8 +118,21 @@ export default function Finance() {
     branch: string;
     quantity: number;
     totalValue: number;
+    totalSellValue: number;
   }
-  const { data: goodsCapitalDetails } = useQuery<{ items: GoodsCapitalItem[]; totalCapital: number }>({
+  interface MissingCostItem {
+    productId: string;
+    productName: string;
+    sellPrice: number;
+    branch: string;
+    quantity: number;
+  }
+  const { data: goodsCapitalDetails } = useQuery<{
+    items: GoodsCapitalItem[];
+    missingCostPrice: MissingCostItem[];
+    totalCapital: number;
+    totalSellValue: number;
+  }>({
     queryKey: ["/api/goods-capital-details"],
   });
 
@@ -180,6 +194,10 @@ export default function Finance() {
     },
   });
 
+  const { data: allCapitalTransactions = [] } = useQuery<any[]>({
+    queryKey: ["/api/capital-transactions"],
+  });
+
   const createCapitalTxMutation = useMutation({
     mutationFn: async (data: any) => {
       const { ownerAccountId, ...txData } = data;
@@ -188,8 +206,39 @@ export default function Finance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/owner-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/capital-transactions"] });
       setCapitalTxDialogOpen(false);
       toast({ title: t("success") || "Success" });
+    },
+    onError: () => {
+      toast({ title: t("error") || "Error", variant: "destructive" });
+    },
+  });
+
+  const deleteCapitalTxMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/capital-transactions/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/owner-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/capital-transactions"] });
+      toast({ title: t("deleted") || "Deleted", description: t("transactionDeleted") || "Transaction removed and balance updated" });
+    },
+    onError: () => {
+      toast({ title: t("error") || "Error", variant: "destructive" });
+    },
+  });
+
+  const deleteOwnerAccountMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/owner-accounts/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/owner-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/capital-transactions"] });
+      toast({ title: t("deleted") || "Deleted", description: t("partnerDeleted") || "Partner and all their transactions removed" });
     },
     onError: () => {
       toast({ title: t("error") || "Error", variant: "destructive" });
@@ -516,48 +565,99 @@ export default function Finance() {
             </Card>
           </div>
 
-          {goodsCapitalDetails && goodsCapitalDetails.items.length > 0 && (
-            <Card data-testid="card-goods-capital-details">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-amber-500" />
-                  {t("goodsCapitalDetails") || "Goods Capital Details"}
-                </CardTitle>
-                <CardDescription>{t("goodsCapitalDetailsDesc") || "Breakdown of inventory value by product"}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="border rounded-md overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("product") || "Product"}</TableHead>
-                        <TableHead>{t("branch") || "Branch"}</TableHead>
-                        <TableHead className="text-center">{t("quantity") || "Qty"}</TableHead>
-                        <TableHead className="text-center">{t("costPrice") || "Cost Price"}</TableHead>
-                        <TableHead className="text-center">{t("sellPrice") || "Sell Price"}</TableHead>
-                        <TableHead className="text-center">{t("totalValue") || "Total Value"}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {goodsCapitalDetails.items.map((item, idx) => (
-                        <TableRow key={`${item.productId}-${item.branch}-${idx}`}>
-                          <TableCell className="font-medium">{item.productName}</TableCell>
-                          <TableCell><Badge variant="outline">{item.branch}</Badge></TableCell>
-                          <TableCell className="text-center">{item.quantity}</TableCell>
-                          <TableCell className="text-center">{item.costPrice.toFixed(2)} LYD</TableCell>
-                          <TableCell className="text-center">{item.sellPrice.toFixed(2)} LYD</TableCell>
-                          <TableCell className="text-center font-semibold text-amber-600">{item.totalValue.toFixed(2)} LYD</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div className="flex justify-between items-center mt-4 pt-3 border-t">
-                  <span className="font-semibold">{t("totalGoodsCapital") || "Total Goods Capital"}</span>
-                  <span className="text-xl font-bold text-amber-600">{goodsCapitalDetails.totalCapital.toFixed(2)} LYD</span>
-                </div>
-              </CardContent>
-            </Card>
+          {goodsCapitalDetails && (goodsCapitalDetails.items.length > 0 || (goodsCapitalDetails.missingCostPrice?.length ?? 0) > 0) && (
+            <div className="space-y-4">
+              {(goodsCapitalDetails.missingCostPrice?.length ?? 0) > 0 && (
+                <Card className="border-orange-300 bg-orange-50 dark:bg-orange-950/20" data-testid="card-missing-cost-price">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                      <AlertTriangle className="h-5 w-5" />
+                      {t("missingCostPrice") || "Products Missing Cost Price"}
+                      <Badge className="ml-2 bg-orange-500">{goodsCapitalDetails.missingCostPrice.length}</Badge>
+                    </CardTitle>
+                    <CardDescription className="text-orange-600 dark:text-orange-500">
+                      {t("missingCostPriceDesc") || "These products have stock but no cost price set — they are excluded from goods capital calculation"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border border-orange-200 rounded-md overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t("product") || "Product"}</TableHead>
+                            <TableHead>{t("branch") || "Branch"}</TableHead>
+                            <TableHead className="text-center">{t("quantity") || "Qty"}</TableHead>
+                            <TableHead className="text-center">{t("sellPrice") || "Sell Price"}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {goodsCapitalDetails.missingCostPrice.map((item, idx) => (
+                            <TableRow key={`missing-${item.productId}-${item.branch}-${idx}`}>
+                              <TableCell className="font-medium text-orange-700 dark:text-orange-400">{item.productName}</TableCell>
+                              <TableCell><Badge variant="outline">{item.branch}</Badge></TableCell>
+                              <TableCell className="text-center">{item.quantity}</TableCell>
+                              <TableCell className="text-center">{item.sellPrice.toFixed(2)} LYD</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {goodsCapitalDetails.items.length > 0 && (
+                <Card data-testid="card-goods-capital-details">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5 text-amber-500" />
+                      {t("goodsCapitalDetails") || "Goods Capital Details"}
+                    </CardTitle>
+                    <CardDescription>{t("goodsCapitalDetailsDesc") || "Breakdown of inventory value by product (cost price vs selling price)"}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border rounded-md overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t("product") || "Product"}</TableHead>
+                            <TableHead>{t("branch") || "Branch"}</TableHead>
+                            <TableHead className="text-center">{t("quantity") || "Qty"}</TableHead>
+                            <TableHead className="text-center">{t("costPrice") || "Cost"}</TableHead>
+                            <TableHead className="text-center">{t("sellPrice") || "Sell"}</TableHead>
+                            <TableHead className="text-center text-amber-600">{t("costTotal") || "Cost Total"}</TableHead>
+                            <TableHead className="text-center text-green-600">{t("sellTotal") || "Sell Total"}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {goodsCapitalDetails.items.map((item, idx) => (
+                            <TableRow key={`${item.productId}-${item.branch}-${idx}`}>
+                              <TableCell className="font-medium">{item.productName}</TableCell>
+                              <TableCell><Badge variant="outline">{item.branch}</Badge></TableCell>
+                              <TableCell className="text-center">{item.quantity}</TableCell>
+                              <TableCell className="text-center text-muted-foreground">{item.costPrice.toFixed(2)}</TableCell>
+                              <TableCell className="text-center text-muted-foreground">{item.sellPrice.toFixed(2)}</TableCell>
+                              <TableCell className="text-center font-semibold text-amber-600">{item.totalValue.toFixed(2)}</TableCell>
+                              <TableCell className="text-center font-semibold text-green-600">{item.totalSellValue.toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-4 pt-3 border-t">
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">{t("totalCostCapital") || "Total Cost Capital"}</p>
+                        <p className="text-xl font-bold text-amber-600">{goodsCapitalDetails.totalCapital.toFixed(2)} LYD</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">{t("totalSellValue") || "Total Sell Value"}</p>
+                        <p className="text-xl font-bold text-green-600">{goodsCapitalDetails.totalSellValue.toFixed(2)} LYD</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -1156,14 +1256,16 @@ export default function Finance() {
         </TabsContent>
 
         <TabsContent value="capital" className="space-y-4">
+          {/* Header + actions */}
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">{t("ownerAccountsCapital") || "Owner Accounts & Capital"}</h2>
+            <h2 className="text-xl font-semibold">{t("ownerAccountsCapital") || "Partners & Capital"}</h2>
             <div className="flex gap-2">
+              {/* Add Transaction dialog */}
               <Dialog open={capitalTxDialogOpen} onOpenChange={setCapitalTxDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" data-testid="button-capital-transaction">
                     <ArrowUpRight className="h-4 w-4 mr-2" />
-                    {t("capitalTransaction") || "Capital Transaction"}
+                    {t("capitalTransaction") || "Transaction"}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -1174,23 +1276,22 @@ export default function Finance() {
                     onSubmit={(e) => {
                       e.preventDefault();
                       const formData = new FormData(e.currentTarget);
+                      const safeVal = formData.get("safeId") as string;
                       createCapitalTxMutation.mutate({
                         ownerAccountId: formData.get("ownerAccountId") as string,
                         type: formData.get("type") as string,
                         amount: formData.get("amount") as string,
                         currency: formData.get("currency") as string,
-                        safeId: formData.get("safeId") as string || undefined,
+                        safeId: safeVal && safeVal !== "none" ? safeVal : undefined,
                         description: formData.get("description") as string || undefined,
                       });
                     }}
                     className="space-y-4"
                   >
                     <div className="space-y-2">
-                      <Label>{t("ownerAccount") || "Owner Account"}</Label>
-                      <Select name="ownerAccountId" required>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("selectOwner") || "Select owner"} />
-                        </SelectTrigger>
+                      <Label>{t("ownerAccount") || "Partner"}</Label>
+                      <Select name="ownerAccountId" defaultValue={selectedOwnerAccount || undefined} required>
+                        <SelectTrigger><SelectValue placeholder={t("selectOwner") || "Select partner"} /></SelectTrigger>
                         <SelectContent>
                           {ownerAccounts.map((acc: any) => (
                             <SelectItem key={acc.id} value={acc.id}>{acc.ownerName}</SelectItem>
@@ -1202,21 +1303,17 @@ export default function Finance() {
                       <div className="space-y-2">
                         <Label>{t("type") || "Type"}</Label>
                         <Select name="type" required>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="injection">{t("capitalInjection") || "Capital Injection"}</SelectItem>
-                            <SelectItem value="withdrawal">{t("capitalWithdrawal") || "Capital Withdrawal"}</SelectItem>
+                            <SelectItem value="injection">{t("capitalInjection") || "Injection"}</SelectItem>
+                            <SelectItem value="withdrawal">{t("capitalWithdrawal") || "Withdrawal"}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2">
                         <Label>{t("currency") || "Currency"}</Label>
                         <Select name="currency" defaultValue="USD">
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="USD">USD</SelectItem>
                             <SelectItem value="LYD">LYD</SelectItem>
@@ -1226,16 +1323,14 @@ export default function Finance() {
                     </div>
                     <div className="space-y-2">
                       <Label>{t("amount") || "Amount"}</Label>
-                      <Input name="amount" type="number" step="0.01" required />
+                      <Input name="amount" type="number" step="0.01" min="0.01" required />
                     </div>
                     <div className="space-y-2">
-                      <Label>{t("cashbox") || "Cashbox"}</Label>
+                      <Label>{t("cashbox") || "Cashbox"} ({t("optional") || "optional"})</Label>
                       <Select name="safeId">
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("selectCashbox") || "Select cashbox"} />
-                        </SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t("noCashbox") || "No cashbox"} /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">{t("noCashbox") || "No Cashbox"}</SelectItem>
+                          <SelectItem value="none">{t("noCashbox") || "None"}</SelectItem>
                           {safes.filter(s => s.isActive).map(safe => (
                             <SelectItem key={safe.id} value={safe.id}>{safe.name}</SelectItem>
                           ))}
@@ -1255,16 +1350,17 @@ export default function Finance() {
                 </DialogContent>
               </Dialog>
 
+              {/* Add Partner dialog */}
               <Dialog open={ownerAccountDialogOpen} onOpenChange={setOwnerAccountDialogOpen}>
                 <DialogTrigger asChild>
                   <Button data-testid="button-add-owner-account">
                     <UserCircle className="h-4 w-4 mr-2" />
-                    {t("addOwnerAccount") || "Add Owner"}
+                    {t("addOwnerAccount") || "Add Partner"}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>{t("createOwnerAccount") || "Create Owner Account"}</DialogTitle>
+                    <DialogTitle>{t("createOwnerAccount") || "Add Partner"}</DialogTitle>
                   </DialogHeader>
                   <form
                     onSubmit={(e) => {
@@ -1279,15 +1375,13 @@ export default function Finance() {
                     className="space-y-4"
                   >
                     <div className="space-y-2">
-                      <Label>{t("ownerName") || "Owner Name"}</Label>
+                      <Label>{t("ownerName") || "Partner Name"}</Label>
                       <Input name="ownerName" required data-testid="input-owner-name" />
                     </div>
                     <div className="space-y-2">
                       <Label>{t("currency") || "Currency"}</Label>
                       <Select name="currency" defaultValue="USD">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="USD">USD</SelectItem>
                           <SelectItem value="LYD">LYD</SelectItem>
@@ -1309,46 +1403,210 @@ export default function Finance() {
             </div>
           </div>
 
+          {/* Total capital summary */}
+          {ownerAccounts.length > 0 && (() => {
+            const totalCapital = ownerAccounts.reduce((sum: number, a: any) => sum + parseFloat(a.capitalBalance || "0"), 0);
+            return (
+              <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200">
+                <CardContent className="pt-5">
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("totalCapital") || "Total Capital"}</p>
+                      <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">${totalCapital.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("partners") || "Partners"}</p>
+                      <p className="text-2xl font-bold">{ownerAccounts.length}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("transactions") || "Transactions"}</p>
+                      <p className="text-2xl font-bold">{allCapitalTransactions.length}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           {ownerAccounts.length === 0 ? (
             <Card>
               <CardContent className="pt-6">
                 <div className="text-center py-8">
                   <UserCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">{t("noOwnerAccounts") || "No owner accounts created yet"}</p>
+                  <p className="text-muted-foreground">{t("noOwnerAccounts") || "No partners added yet"}</p>
                 </div>
               </CardContent>
             </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {ownerAccounts.map((account: any) => (
-                <Card key={account.id} className="border-2">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <UserCircle className="h-5 w-5" />
-                      {account.ownerName}
-                    </CardTitle>
-                    <CardDescription>{account.notes || t("ownerAccount") || "Owner Account"}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">{t("capitalBalance") || "Capital Balance"}</span>
-                        <span className="text-xl font-bold text-green-600">
-                          {account.currency === "LYD" ? "" : "$"}{parseFloat(account.capitalBalance || "0").toFixed(2)} {account.currency === "LYD" ? "LYD" : ""}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">{t("personalBalance") || "Personal Balance"}</span>
-                        <span className="text-lg font-semibold">
-                          {account.currency === "LYD" ? "" : "$"}{parseFloat(account.personalBalance || "0").toFixed(2)} {account.currency === "LYD" ? "LYD" : ""}
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+          ) : (() => {
+            const totalCapital = ownerAccounts.reduce((sum: number, a: any) => sum + parseFloat(a.capitalBalance || "0"), 0);
+            return (
+              <div className="space-y-3">
+                {ownerAccounts.map((account: any) => {
+                  const balance = parseFloat(account.capitalBalance || "0");
+                  const ownership = totalCapital > 0 ? (balance / totalCapital) * 100 : 0;
+                  const partnerTxs = allCapitalTransactions.filter((tx: any) => tx.ownerAccountId === account.id);
+                  const isExpanded = expandedPartner === account.id;
+                  const injections = partnerTxs.filter((tx: any) => tx.type === "injection").reduce((s: number, tx: any) => s + parseFloat(tx.amount || "0"), 0);
+                  const withdrawals = partnerTxs.filter((tx: any) => tx.type === "withdrawal").reduce((s: number, tx: any) => s + parseFloat(tx.amount || "0"), 0);
+
+                  return (
+                    <Card key={account.id} className="border-2" data-testid={`card-partner-${account.id}`}>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <UserCircle className="h-6 w-6 text-blue-500" />
+                            <div>
+                              <CardTitle className="text-lg">{account.ownerName}</CardTitle>
+                              {account.notes && <CardDescription>{account.notes}</CardDescription>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {/* Quick-add transaction for this partner */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedOwnerAccount(account.id);
+                                setCapitalTxDialogOpen(true);
+                              }}
+                              data-testid={`button-add-tx-${account.id}`}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              {t("transaction") || "Tx"}
+                            </Button>
+                            {/* Delete partner */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => {
+                                if (confirm(`${t("confirmDeletePartner") || "Delete partner"} "${account.ownerName}"? ${t("thisWillDeleteAllTx") || "This will also delete all their transactions."}`)) {
+                                  deleteOwnerAccountMutation.mutate(account.id);
+                                }
+                              }}
+                              disabled={deleteOwnerAccountMutation.isPending}
+                              data-testid={`button-delete-partner-${account.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="space-y-4">
+                        {/* Stats row */}
+                        <div className="grid grid-cols-4 gap-3">
+                          <div className="text-center p-2 rounded-lg bg-muted/50">
+                            <p className="text-xs text-muted-foreground">{t("capitalBalance") || "Balance"}</p>
+                            <p className="text-lg font-bold text-green-600">
+                              {account.currency === "LYD" ? "" : "$"}{balance.toFixed(2)}{account.currency === "LYD" ? " LYD" : ""}
+                            </p>
+                          </div>
+                          <div className="text-center p-2 rounded-lg bg-muted/50">
+                            <p className="text-xs text-muted-foreground">{t("ownership") || "Ownership"}</p>
+                            <p className="text-lg font-bold text-blue-600">{ownership.toFixed(1)}%</p>
+                          </div>
+                          <div className="text-center p-2 rounded-lg bg-green-50 dark:bg-green-950/30">
+                            <p className="text-xs text-muted-foreground">{t("injections") || "In"}</p>
+                            <p className="text-sm font-semibold text-green-600">+{injections.toFixed(2)}</p>
+                          </div>
+                          <div className="text-center p-2 rounded-lg bg-red-50 dark:bg-red-950/30">
+                            <p className="text-xs text-muted-foreground">{t("withdrawals") || "Out"}</p>
+                            <p className="text-sm font-semibold text-red-600">-{withdrawals.toFixed(2)}</p>
+                          </div>
+                        </div>
+
+                        {/* Ownership progress bar */}
+                        <div>
+                          <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                            <span>{t("ownershipShare") || "Ownership share"}</span>
+                            <span>{ownership.toFixed(1)}%</span>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-blue-500 rounded-full transition-all"
+                              style={{ width: `${Math.min(ownership, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Transaction history (collapsible) */}
+                        {partnerTxs.length > 0 && (
+                          <div>
+                            <button
+                              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground w-full"
+                              onClick={() => setExpandedPartner(isExpanded ? null : account.id)}
+                              data-testid={`button-expand-partner-${account.id}`}
+                            >
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              {t("transactions") || "Transactions"} ({partnerTxs.length})
+                            </button>
+
+                            {isExpanded && (
+                              <div className="mt-2 border rounded-md overflow-x-auto">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead className="text-xs">{t("date") || "Date"}</TableHead>
+                                      <TableHead className="text-xs">{t("type") || "Type"}</TableHead>
+                                      <TableHead className="text-xs">{t("amount") || "Amount"}</TableHead>
+                                      <TableHead className="text-xs">{t("description") || "Notes"}</TableHead>
+                                      <TableHead className="text-xs w-10"></TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {partnerTxs.map((tx: any) => (
+                                      <TableRow key={tx.id} data-testid={`row-capital-tx-${tx.id}`}>
+                                        <TableCell className="text-xs whitespace-nowrap">
+                                          {tx.createdAt ? format(new Date(tx.createdAt), "yyyy-MM-dd") : "-"}
+                                        </TableCell>
+                                        <TableCell>
+                                          <Badge
+                                            variant={tx.type === "injection" ? "default" : "destructive"}
+                                            className="text-xs"
+                                          >
+                                            {tx.type === "injection"
+                                              ? (t("capitalInjection") || "Injection")
+                                              : (t("capitalWithdrawal") || "Withdrawal")}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell className={`text-sm font-semibold ${tx.type === "injection" ? "text-green-600" : "text-red-600"}`}>
+                                          {tx.type === "injection" ? "+" : "-"}{parseFloat(tx.amount || "0").toFixed(2)} {tx.currency}
+                                        </TableCell>
+                                        <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">
+                                          {tx.description || "-"}
+                                        </TableCell>
+                                        <TableCell>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-red-400 hover:text-red-600"
+                                            onClick={() => {
+                                              if (confirm(t("confirmDeleteTransaction") || "Delete this transaction? The balance will be reversed.")) {
+                                                deleteCapitalTxMutation.mutate(tx.id);
+                                              }
+                                            }}
+                                            disabled={deleteCapitalTxMutation.isPending}
+                                            data-testid={`button-delete-tx-${tx.id}`}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </TabsContent>
 
         <TabsContent value="transactions" className="space-y-6">

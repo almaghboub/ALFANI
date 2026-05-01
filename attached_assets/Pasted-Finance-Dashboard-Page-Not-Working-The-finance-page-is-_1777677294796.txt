@@ -1,0 +1,84 @@
+Finance / Dashboard Page Not Working
+
+The finance page is showing all values as 0.00 even though there is real data in the system.
+
+Please fix:
+
+Bank / Cashbox balance should come from cashbox transactions
+Customer debts should come from unpaid credit invoices
+Supplier debts should come from unpaid purchases (if available)
+Product capital should be calculated from stock (quantity × cost price)
+Store capital and partner capital should be calculated correctly
+
+Make sure all values are calculated from real database data and update automatically after any operation (invoices, returns, expenses, etc.).
+
+Product Capital (Very Important)
+
+Right now the system is calculating based on selling price, which is wrong.
+
+Please fix:
+
+Add or use a Cost Price field for each product
+Product Capital must be calculated as:
+Quantity in stock × Cost Price
+Do NOT use selling price for capital
+If a product does not have a cost price:
+Do NOT calculate it using selling price
+Show it as “Missing Cost Price”
+Allow me to enter the cost price manually
+Add a report showing:
+Total selling value
+Total real capital (cost value)
+Products missing cost price
+Partner Capital (Store Capital - Partners)
+
+There are issues with partner percentages and transactions.
+
+Please fix:
+
+Ownership percentage must update automatically based on total invested capital
+If a partner adds or removes money, the percentage must change correctly
+Allow editing Partner Transactions
+Allow deleting Partner Transactions
+
+When deleting:
+
+If deleting an investment → remove it from total invested
+If deleting a withdrawal → return the amount back correctly
+All values must update automatically:
+Total invested
+Total withdrawn
+Net balance
+Total capital
+Ownership percentage
+Invoice Return / Credit System
+
+I cannot return invoices, especially credit invoices.
+
+Please implement:
+
+Ability to return or cancel invoices (cash and credit)
+Do NOT delete invoices, only mark as:
+returned
+partially returned
+When returning:
+stock must be restored
+totals must update correctly
+
+For credit invoices:
+
+customer debt must be reduced correctly
+
+Example:
+
+Customer owes 300
+Return invoice of 100
+New balance = 200
+Support partial return (return some products only)
+
+Please make sure:
+
+No database reset
+No data loss
+All calculations are correct and consistent
+All sections are connected and update automatically

@@ -1,8 +1,6 @@
 # Overview
 
-This project is a comprehensive logistics and order management system built with React, Express, and PostgreSQL. It offers role-based access for various staff (owner, customer service, receptionist, sorter, stock manager, shipping), enabling management of orders, customers, inventory, profits, and delivery tasks. Key features include modern authentication, real-time data, bilingual support (English/Arabic), a responsive UI, streamlined data entry, and a complete shipping/delivery task management system. The system aims to optimize logistics, enhance profit tracking, and improve delivery coordination. It includes advanced features like an owner-only performance report system with key KPIs and a comprehensive LYD currency conversion system tracking per-order exchange rates.
-
-**Performance**: Optimized for 100,000+ products with server-side pagination (50 items/page, max 200), pg_trgm GIN trigram indexes for fast text search, pure SQL stats aggregation, and debounced search (400ms). All product endpoints are paginated - no full-table loads.
+This project is a comprehensive logistics and order management system designed to optimize logistics, enhance profit tracking, and improve delivery coordination. Built with React, Express, and PostgreSQL, it offers role-based access for various staff roles (owner, customer service, receptionist, sorter, stock manager, shipping). The system enables robust management of orders, customers, inventory, profits, and delivery tasks. Key capabilities include modern authentication, real-time data, bilingual support (English/Arabic), a responsive UI, streamlined data entry, and a complete shipping/delivery task management system. It also features an owner-only performance report system with key KPIs and a comprehensive LYD currency conversion system tracking per-order exchange rates, and is optimized for high performance with large datasets.
 
 # User Preferences
 
@@ -12,170 +10,48 @@ Preferred communication style: Simple, everyday language.
 
 ## Frontend Architecture
 
-The frontend is a React 18 TypeScript SPA using Wouter for routing, TanStack Query for server state, and Tailwind CSS with shadcn/ui for styling. React Hook Form with Zod handles forms, and Vite is used for building. Global state is managed via React Context. The UI/UX emphasizes responsiveness, bilingual support, and streamlined data entry across desktop and mobile.
+The frontend is a React 18 TypeScript Single Page Application utilizing Wouter for routing, TanStack Query for server state management, and Tailwind CSS with shadcn/ui for styling. Form handling is managed with React Hook Form and Zod, and the build process uses Vite. Global state is managed via React Context. The UI/UX is designed for responsiveness, bilingual support, and streamlined data entry across all devices.
 
 ## Backend Architecture
 
-The backend is an Express.js TypeScript REST API. It uses Passport.js for authentication and role-based access control. PostgreSQL with Drizzle ORM handles data persistence and session management. API endpoints are feature-organized with Zod for request validation.
-
-**Invoice/Return Transaction Safety (February 2026)**:
-- All invoice operations (create, update, delete, return) wrapped in `db.transaction()` with automatic rollback on failure
-- `SELECT ... FOR UPDATE` row locking on `branch_inventory` and `invoice_items` rows prevents race conditions and over-returns
-- Idempotency keys via `X-Idempotency-Key` header + `idempotency_keys` table prevent duplicate inserts from network retries (atomic acquire pattern)
-- `operation_log` table provides full audit trail for all invoice/return operations
-- Database CHECK constraints: `invoice_items.quantity > 0`, `invoice_items.line_total >= 0`, `branch_inventory.quantity >= 0`
-- Frontend generates unique idempotency keys per invoice creation and return operation
+The backend is an Express.js TypeScript REST API. It uses Passport.js for authentication and role-based access control. Data persistence and session management are handled by PostgreSQL with Drizzle ORM. API endpoints are organized by feature and include Zod for request validation. A critical design decision ensures transactional safety for all invoice and return operations using database transactions, row locking (`SELECT ... FOR UPDATE`), and idempotency keys to prevent race conditions and duplicate entries. An `operation_log` table provides a full audit trail. The system also includes a robust Partner Capital System for managing owner accounts and transactions, and a Goods Capital system that tracks product capital, identifies missing cost prices, and displays both cost and selling values.
 
 ## Data Storage Solutions
 
-PostgreSQL is the primary database, accessed via Drizzle ORM. Neon serverless PostgreSQL provides cloud deployment. The schema is relational, with foreign keys across users, customers, orders, inventory, and shipping rates, utilizing enums for roles/statuses and numeric types for currency.
+PostgreSQL is the primary database, accessed via Drizzle ORM, with Neon serverless PostgreSQL for cloud deployment. The schema is relational, employing foreign keys and enums for roles and statuses, and numeric types for currency.
 
 ## Authentication and Authorization Mechanisms
 
-Security involves session-based authentication with Passport.js and bcrypt-hashed passwords. Role-based middleware enforces authorization. Sessions are persistent and stored in PostgreSQL. Both frontend and backend implement route guards for authentication and authorization.
+Security is implemented through session-based authentication with Passport.js and bcrypt-hashed passwords. Role-based middleware enforces authorization. Sessions are persistent and stored in PostgreSQL, with both frontend and backend implementing route guards for security.
 
 ## UI/UX Decisions & Feature Specifications
 
-The system features comprehensive functionality with responsive interface, bilingual support (English/Arabic), and streamlined data entry:
+The system provides comprehensive functionality with a responsive, bilingual (English/Arabic) interface:
 
-- **Comprehensive Shipping/Delivery Task Management**: Dedicated "shipping_staff" role with dashboard, task assignment interface, status updates (completed, to collect with customer code), payment collection workflow, and performance tracking. Full bilingual support with RTL layout and smart search across all fields.
-
-- **Internal Messaging System**: Conversation threading, real-time notifications, and chat-style UI for viewing full message history between users.
-
-- **User Profile Management**: All users can edit their own username, name, and password with secure validation.
-
-- **Enhanced Profit Page**: Detailed metrics, average order value, country-specific filtering, and customer shipping code reporting with comprehensive profit breakdown (items profit, shipping profit, total profit).
-
-- **Unified Profit Reports Page (Owner-Only)**: 
-  - Single-page unified view with all profit metrics and performance analytics in one scrollable page
-  - Profit Metrics Section with profit trend analysis and country filtering
-  - Report generation buttons (Profit, Financial)
-  - Performance analytics with 10 KPIs (Total Orders, Sales, Profit, Discounted Orders, Average Order Value/Profit, Exchange Rate, Growth %)
-  - Advanced filtering: time range (Daily, Weekly, Monthly), multi-select country filtering, custom date range with "from" and "to" date pickers
-  - Visual growth indicators (TrendingUp/TrendingDown icons) with color-coded trends
-  - Backend: GET `/api/reports/performance?range=daily|weekly|monthly&country[]=...&dateFrom=...&dateTo=...`
-  - Bilingual display (English/Arabic) with proper RTL layout
-
-- **Credit System - Customer Receivables & Supplier Payables (February 2026)**:
-  - Invoice payment type toggle: Cash (default) or Credit
-  - Credit invoices track `paymentStatus` (paid/unpaid/partially_paid), `paidAmount`, `remainingAmount`
-  - `credit_payments` table records partial payments against credit invoices
-  - Dedicated "Credits & Debts" page (`/credits`, owner-only) with:
-    - Summary cards: Total Receivables, Total Payables, counts
-    - Customer Receivables table with payment recording dialog
-    - Supplier Payables table with pay supplier dialog
-    - Payment history per invoice (expandable rows)
-    - Status badges: Unpaid (red), Partially Paid (amber), Paid (green)
-  - API routes: GET/POST `/api/credit/invoices`, `/api/credit/payments`, `/api/credit/summary`, `/api/credit/supplier-debts`, `/api/credit/supplier-payments`
-  - Full bilingual support (English/Arabic) with RTL layout
-
-- **Global Price Markup System (February 2026)**:
-  - Owner-controlled global percentage markup to protect prices against exchange rate instability
-  - Setting stored as `global_markup_percentage` in settings table
-  - Formula: `Final Price = Base Price × (1 + Markup / 100)`
-  - Base prices in database are NEVER modified — markup applied dynamically at display/invoice time
-  - Invoice page shows markup banner when active, product list shows both base and final prices
-  - Settings page UI with percentage input, save button, and live example preview
-  - Full bilingual support (English/Arabic)
-
-- **LYD Currency Conversion System with Dual Exchange Rates (November 2025)**: 
-  - `useLydExchangeRate` hook for centralized management
-  - Dual-currency display (USD/LYD) across dashboards, orders, customers, invoices, and profit reports
-  - **Dual Exchange Rate System**: Separate purchase rate (cost to buy USD) and sale rate (price sold to customers) for tracking exchange profit margin
-  - Global exchange rates stored in settings table:
-    - `lyd_purchase_exchange_rate`: Rate paid to buy USD (default: 4.80)
-    - `lyd_exchange_rate` (sale rate): Rate sold to customers (default: 4.85)
-  - **Per-Order Exchange Rate Tracking (November 4, 2025)**:
-    - Both purchase and sale rates saved per order in `orders.lyd_exchange_rate` and `orders.lyd_purchase_exchange_rate`
-    - Dual exchange rate input fields in new order dialog with auto-population from global settings
-    - Rates can be overridden per-order for real-time accuracy as rates change throughout the day
-    - Historical rate tracking ensures accurate profit calculations even as global rates change
-    - Order details modal displays both rates and calculated exchange profit/loss for each order
-  - **Exchange Rate Profit/Loss Calculation**: `(sale_rate - purchase_rate) × order_total` calculated using per-order rates
-  - Settings page UI for managing both global purchase and sale exchange rates with bilingual support
-  - Exchange rate profit/loss integrated into profit page:
-    - Dedicated line item showing profit (amber/gold) or loss (red) in LYD
-    - USD mode: Shows "$XXX USD ± YYY LYD" to display both profit components
-    - LYD mode: Single combined total including all profit/loss streams
-    - Profit margin note in USD mode explains exclusion of LYD component
-  - Financial reports show separate profit components (items, shipping, exchange rate)
-  - Consistent currency conversion: values converted once at calculation level to prevent double-conversion
-  - Color-coded LYD amounts with bold blue formatting
-  - Locale-aware invoice numbering (Dinar/دينار)
-  - Expenses page with dual currency support
-
-- **Order Management**:
-  - New order statuses: "Partially Arrived," "Ready to Collect," "With Shipping Company," "Ready to Buy"
-  - Dynamic country filtering and LYD exchange rate filters
-  - Calendar date range filters
-  - Flexible order creation without prior shipping calculation
-  - Number of pieces field (integer, default: 1) in order items
-  - Automatic order status routing: orders without down payment automatically set to "ready_to_buy" status
-
-- **Ready to Buy Dashboard (November 2025)**:
-  - Dedicated dashboard for orders ready for purchasing
-  - Automatic routing logic: orders WITHOUT down payment → automatically sent to "Ready to Buy" dashboard
-  - Orders WITH down payment → remain in "pending" status until down payment collected
-  - Full search functionality across order number, customer name, phone, and shipping code
-  - Displays order details with dual currency (USD/LYD) support
-  - View order details modal with customer and order information
-  - Role-based access (owner, customer_service, receptionist)
-  - Complete bilingual support (English/Arabic) with proper RTL layout
-  - Orange status badge for visual identification
-
-- **Customer Management**: 
-  - Customer-level down payment management with proportional distribution
-  - Multi-field customer search (phone, name, code)
-  - Enhanced visibility of customer codes in invoices and tables
-  - Customer creation form with 5 essential fields (First Name, Last Name, Phone Number, City, Customer Code)
-  - Form layout with side-by-side name fields in 2-column grid
-
-- **Order Image Upload System (October 28, 2025)**: 
-  - Direct device file selection for order images
-  - Cloud-based object storage integration
-  - Support for up to 3 images per order with validation
-  - Accepted formats: JPG, PNG, GIF (max 5MB)
-  - Backend: POST `/api/upload-url` generates pre-signed URLs
-
-- **Complete Arabic Translation Coverage**: 
-  - All UI elements, modals, and reports fully translated
-  - All edit order modal fields translated
-  - All sales report types translated with Arabic table headers
-  - Invoice and order details modals with locale-aware date formatting
-  - Proper RTL layout throughout
-
-- **Commission Functionality Removed (October 2025)**:
-  - Complete removal of commission calculations and displays from all pages
-  - Commission database fields remain but are not calculated or displayed
-  - Simplified profit tracking focuses on items profit, shipping profit, and total profit
-
-- **Mobile RTL (Arabic) Fixes (October 2025)**:
-  - Fixed dialog/modal positioning in RTL mode with proper Tailwind RTL support
-  - RTL-aware close button positioning in dialogs
-  - Fixed text alignment in dialog headers with RTL support
-  - Touch-action: none on dialog overlays to prevent mobile scroll issues
-  - Fixed Select component padding and checkmark positioning for RTL
-  - Resolved freezing issues with Arabic language and mobile zoom
-
-- **Responsive Design Implementation**: 
-  - Fully responsive UI across phones, tablets, and desktops
-  - Responsive sidebar navigation with hamburger menu on mobile
-  - Tables with horizontal scrolling
-  - Specific fixes for iOS Safari RTL initialization
-  - Dialogs perfectly centered in both LTR and RTL
-
-- **Persistent Dark Mode**: ThemeProvider with localStorage sync for dark mode preferences
+-   **Comprehensive Shipping/Delivery Task Management**: A dedicated "shipping_staff" role dashboard with task assignment, status updates, payment collection, and performance tracking.
+-   **Internal Messaging System**: Features conversation threading, real-time notifications, and a chat-style UI.
+-   **User Profile Management**: Allows users to securely edit their username, name, and password.
+-   **Enhanced Profit Page & Unified Reports**: Detailed profit metrics, average order value, country-specific filtering, and an owner-only unified profit reports page with 10 KPIs, advanced filtering (time range, country, custom dates), and visual growth indicators.
+-   **Credit System - Customer Receivables & Supplier Payables**: Supports credit invoices with `paymentStatus`, `paidAmount`, `remainingAmount`, and a dedicated "Credits & Debts" page for managing receivables, payables, and payment history.
+-   **Global Price Markup System**: An owner-controlled percentage markup system applied dynamically to product prices for exchange rate stability, without modifying base prices in the database.
+-   **LYD Currency Conversion System with Dual Exchange Rates**: Implements dual-currency display (USD/LYD) across the system. It tracks separate purchase and sale exchange rates globally and per-order, enabling accurate profit calculation and exchange rate profit/loss tracking.
+-   **Order Management**: Includes new order statuses, dynamic country and LYD exchange rate filters, calendar date range filters, flexible order creation, and automatic order status routing for "Ready to Buy" items.
+-   **Ready to Buy Dashboard**: A dedicated dashboard for orders awaiting purchase, with automatic routing based on down payment status.
+-   **Customer Management**: Features customer-level down payment management, multi-field search, enhanced visibility of customer codes, and streamlined customer creation.
+-   **Order Image Upload System**: Supports direct device file selection and cloud-based object storage for up to 3 images per order.
+-   **Complete Arabic Translation Coverage**: All UI elements, modals, and reports are fully translated with proper RTL layout.
+-   **Responsive Design Implementation**: Fully responsive UI across all devices, with specific fixes for RTL and mobile experiences.
+-   **Persistent Dark Mode**: ThemeProvider with localStorage sync for dark mode preferences.
 
 # External Dependencies
 
 ## Third-Party Services
 
-- **Neon Database**: Serverless PostgreSQL hosting.
-- **Replit Integration**: Development environment plugins.
+-   **Neon Database**: Serverless PostgreSQL hosting.
 
 ## Key Libraries and Frameworks
 
-- **Frontend**: React, TypeScript, Vite, Wouter, TanStack Query, Tailwind CSS, shadcn/ui, React Hook Form, Zod.
-- **Backend**: Express.js, Passport.js, Drizzle ORM, connect-pg-simple.
-- **UI Components**: Radix UI primitives.
-- **Utilities**: date-fns, class-variance-authority, clsx.
+-   **Frontend**: React, TypeScript, Vite, Wouter, TanStack Query, Tailwind CSS, shadcn/ui, React Hook Form, Zod.
+-   **Backend**: Express.js, Passport.js, Drizzle ORM, connect-pg-simple.
+-   **UI Components**: Radix UI primitives.
+-   **Utilities**: date-fns, class-variance-authority, clsx.

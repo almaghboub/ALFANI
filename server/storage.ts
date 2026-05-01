@@ -323,10 +323,13 @@ export interface IStorage {
   getAllOwnerAccounts(): Promise<OwnerAccount[]>;
   createOwnerAccount(data: InsertOwnerAccount): Promise<OwnerAccount>;
   updateOwnerAccount(id: string, data: Partial<InsertOwnerAccount>): Promise<OwnerAccount | undefined>;
+  deleteOwnerAccount(id: string): Promise<boolean>;
 
   // Capital Transactions
   getCapitalTransactions(ownerAccountId: string): Promise<CapitalTransaction[]>;
+  getAllCapitalTransactions(): Promise<CapitalTransaction[]>;
   createCapitalTransaction(data: InsertCapitalTransaction): Promise<CapitalTransaction>;
+  deleteCapitalTransaction(id: string): Promise<{ deleted: boolean; type: string; amount: number; ownerAccountId: string } | null>;
 
   // Credit System
   getCreditInvoices(): Promise<SalesInvoiceWithItems[]>;
@@ -1953,10 +1956,15 @@ export class PostgreSQLStorage implements IStorage {
       totalLYD: sql<number>`COALESCE(SUM(balance_lyd::numeric), 0)`,
     }).from(banks);
 
-    // Get customer debt total (balance_owed)
-    const customerDebtResult = await db.select({
-      total: sql<number>`COALESCE(SUM(balance_owed::numeric), 0)`,
-    }).from(customers);
+    // Get customer debt total from unpaid/partially_paid credit invoices
+    const customerDebtRaw = await pool.query(`
+      SELECT COALESCE(SUM(remaining_amount::numeric), 0) AS total
+      FROM sales_invoices
+      WHERE payment_status IN ('unpaid', 'partially_paid')
+        AND remaining_amount IS NOT NULL
+        AND remaining_amount::numeric > 0
+    `);
+    const customerDebtResult = [{ total: customerDebtRaw.rows[0]?.total ?? 0 }];
 
     // Get supplier debt total
     const supplierDebtResult = await db.select({
@@ -2015,32 +2023,60 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getGoodsCapitalDetails(): Promise<{
-    items: Array<{ productId: string; productName: string; costPrice: number; sellPrice: number; branch: string; quantity: number; totalValue: number }>;
+    items: Array<{ productId: string; productName: string; costPrice: number; sellPrice: number; branch: string; quantity: number; totalValue: number; totalSellValue: number }>;
+    missingCostPrice: Array<{ productId: string; productName: string; sellPrice: number; branch: string; quantity: number }>;
     totalCapital: number;
+    totalSellValue: number;
   }> {
-    const result = await db.select({
-      productId: products.id,
-      productName: products.name,
-      costPrice: products.costPrice,
-      sellPrice: products.price,
-      branch: branchInventory.branch,
-      quantity: branchInventory.quantity,
-    }).from(branchInventory)
-      .innerJoin(products, eq(branchInventory.productId, products.id))
-      .where(sql`${branchInventory.quantity} > 0 AND ${products.costPrice} IS NOT NULL`);
+    // Products WITH cost price and stock
+    const withCostRaw = await pool.query(`
+      SELECT p.id as product_id, p.name as product_name,
+             p.cost_price::numeric as cost_price, p.price::numeric as sell_price,
+             bi.branch, bi.quantity::int as quantity
+      FROM branch_inventory bi
+      INNER JOIN products p ON p.id = bi.product_id
+      WHERE bi.quantity > 0
+        AND p.cost_price IS NOT NULL
+        AND p.cost_price::numeric > 0
+      ORDER BY p.name
+    `);
 
-    const items = result.map(r => ({
-      productId: r.productId,
-      productName: r.productName,
-      costPrice: Number(r.costPrice),
-      sellPrice: Number(r.sellPrice),
+    // Products WITHOUT cost price but WITH stock
+    const missingCostRaw = await pool.query(`
+      SELECT p.id as product_id, p.name as product_name,
+             p.price::numeric as sell_price,
+             bi.branch, bi.quantity::int as quantity
+      FROM branch_inventory bi
+      INNER JOIN products p ON p.id = bi.product_id
+      WHERE bi.quantity > 0
+        AND (p.cost_price IS NULL OR p.cost_price::numeric = 0)
+      ORDER BY p.name
+    `);
+
+    const items = withCostRaw.rows.map((r: any) => ({
+      productId: r.product_id,
+      productName: r.product_name,
+      costPrice: Number(r.cost_price),
+      sellPrice: Number(r.sell_price),
       branch: r.branch,
-      quantity: r.quantity,
-      totalValue: r.quantity * Number(r.costPrice),
+      quantity: Number(r.quantity),
+      totalValue: Number(r.quantity) * Number(r.cost_price),
+      totalSellValue: Number(r.quantity) * Number(r.sell_price),
+    }));
+
+    const missingCostPrice = missingCostRaw.rows.map((r: any) => ({
+      productId: r.product_id,
+      productName: r.product_name,
+      sellPrice: Number(r.sell_price),
+      branch: r.branch,
+      quantity: Number(r.quantity),
     }));
 
     const totalCapital = items.reduce((sum, i) => sum + i.totalValue, 0);
-    return { items, totalCapital };
+    const totalSellValue = items.reduce((sum, i) => sum + i.totalSellValue, 0)
+      + missingCostPrice.reduce((sum, i) => sum + i.quantity * i.sellPrice, 0);
+
+    return { items, missingCostPrice, totalCapital, totalSellValue };
   }
 
   // ============ PRODUCTS & INVENTORY ============
@@ -2439,8 +2475,19 @@ export class PostgreSQLStorage implements IStorage {
       }
 
       const newTotal = remainingItems.reduce((sum, item) => sum + Number(item.lineTotal), 0);
+
+      // For credit invoices, recalculate remaining_amount based on new total
+      const updateData: any = { totalAmount: String(newTotal) };
+      if (invoice.paymentStatus === 'unpaid' || invoice.paymentStatus === 'partially_paid') {
+        const paidAmt = parseFloat(invoice.paidAmount || '0');
+        const newRemaining = Math.max(0, newTotal - paidAmt);
+        const newStatus = newRemaining <= 0 ? 'paid' : paidAmt > 0 ? 'partially_paid' : 'unpaid';
+        updateData.remainingAmount = String(newRemaining);
+        updateData.paymentStatus = newStatus;
+      }
+
       const [updated] = await tx.update(salesInvoices)
-        .set({ totalAmount: String(newTotal) })
+        .set(updateData)
         .where(eq(salesInvoices.id, invoiceId))
         .returning();
 
@@ -2506,13 +2553,40 @@ export class PostgreSQLStorage implements IStorage {
     return account;
   }
 
+  async deleteOwnerAccount(id: string): Promise<boolean> {
+    await db.delete(capitalTransactions).where(eq(capitalTransactions.ownerAccountId, id));
+    const result = await db.delete(ownerAccounts).where(eq(ownerAccounts.id, id)).returning();
+    return result.length > 0;
+  }
+
   async getCapitalTransactions(ownerAccountId: string): Promise<CapitalTransaction[]> {
     return await db.select().from(capitalTransactions).where(eq(capitalTransactions.ownerAccountId, ownerAccountId)).orderBy(desc(capitalTransactions.createdAt));
+  }
+
+  async getAllCapitalTransactions(): Promise<CapitalTransaction[]> {
+    return await db.select().from(capitalTransactions).orderBy(desc(capitalTransactions.createdAt));
   }
 
   async createCapitalTransaction(data: InsertCapitalTransaction): Promise<CapitalTransaction> {
     const [transaction] = await db.insert(capitalTransactions).values(data).returning();
     return transaction;
+  }
+
+  async deleteCapitalTransaction(id: string): Promise<{ deleted: boolean; type: string; amount: number; ownerAccountId: string } | null> {
+    const existing = await db.select().from(capitalTransactions).where(eq(capitalTransactions.id, id));
+    if (existing.length === 0) return null;
+    const tx = existing[0];
+    await db.delete(capitalTransactions).where(eq(capitalTransactions.id, id));
+    // Reverse the effect on owner account balance
+    const account = await db.select().from(ownerAccounts).where(eq(ownerAccounts.id, tx.ownerAccountId));
+    if (account.length > 0) {
+      const currentCapital = parseFloat(String(account[0].capitalBalance));
+      const txAmount = parseFloat(String(tx.amount));
+      // Reverse: if injection was deleted, subtract; if withdrawal was deleted, add back
+      const newCapital = tx.type === 'injection' ? currentCapital - txAmount : currentCapital + txAmount;
+      await db.update(ownerAccounts).set({ capitalBalance: String(Math.max(0, newCapital)), updatedAt: new Date() }).where(eq(ownerAccounts.id, tx.ownerAccountId));
+    }
+    return { deleted: true, type: tx.type, amount: parseFloat(String(tx.amount)), ownerAccountId: tx.ownerAccountId };
   }
 
   async getCreditInvoices(): Promise<SalesInvoiceWithItems[]> {

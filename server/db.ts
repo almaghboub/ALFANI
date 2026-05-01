@@ -927,6 +927,40 @@ async function migrateProductsTable() {
       `);
     }
 
+    // Add capital_balance column to owner_accounts if missing
+    try {
+      const oaCols = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'owner_accounts'
+      `);
+      const oaColNames = oaCols.rows.map((r: any) => r.column_name);
+      if (!oaColNames.includes('capital_balance')) {
+        console.log("Migrating: adding capital_balance column to owner_accounts...");
+        await pool.query(`ALTER TABLE owner_accounts ADD COLUMN capital_balance DECIMAL(15,2) NOT NULL DEFAULT 0`);
+        // Seed capital_balance from total_invested - total_withdrawn for existing rows
+        await pool.query(`UPDATE owner_accounts SET capital_balance = GREATEST(total_invested - total_withdrawn, 0)`);
+      }
+      if (!oaColNames.includes('owner_name')) {
+        console.log("Migrating: adding owner_name column to owner_accounts...");
+        await pool.query(`ALTER TABLE owner_accounts ADD COLUMN owner_name TEXT NOT NULL DEFAULT ''`);
+        await pool.query(`UPDATE owner_accounts SET owner_name = name WHERE (owner_name IS NULL OR owner_name = '')`);
+      }
+      if (!oaColNames.includes('currency')) {
+        console.log("Migrating: adding currency column to owner_accounts...");
+        await pool.query(`ALTER TABLE owner_accounts ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD'`);
+      }
+      if (!oaColNames.includes('personal_balance')) {
+        console.log("Migrating: adding personal_balance column to owner_accounts...");
+        await pool.query(`ALTER TABLE owner_accounts ADD COLUMN personal_balance DECIMAL(15,2) NOT NULL DEFAULT 0`);
+      }
+      if (!oaColNames.includes('notes')) {
+        console.log("Migrating: adding notes column to owner_accounts...");
+        await pool.query(`ALTER TABLE owner_accounts ADD COLUMN notes TEXT`);
+      }
+    } catch (e: any) {
+      console.error("owner_accounts migration error:", e?.message);
+    }
+
     // === Database integrity constraints ===
     const constraintQueries = [
       `DO $$ BEGIN
@@ -942,6 +976,20 @@ async function migrateProductsTable() {
       `DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_branch_inventory_quantity_non_negative') THEN
           ALTER TABLE branch_inventory ADD CONSTRAINT chk_branch_inventory_quantity_non_negative CHECK (quantity >= 0);
+        END IF;
+      END $$`,
+      // Unique constraint: one row per product per invoice (prevents double-booking)
+      `DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'uq_invoice_items_invoice_product'
+        ) THEN
+          -- Only add if no existing duplicates
+          IF NOT EXISTS (
+            SELECT invoice_id, product_id FROM invoice_items
+            GROUP BY invoice_id, product_id HAVING COUNT(*) > 1
+          ) THEN
+            ALTER TABLE invoice_items ADD CONSTRAINT uq_invoice_items_invoice_product UNIQUE (invoice_id, product_id);
+          END IF;
         END IF;
       END $$`,
     ];

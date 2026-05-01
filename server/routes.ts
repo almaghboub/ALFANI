@@ -2508,6 +2508,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/capital-transactions", requireOwner, async (req, res) => {
+    try {
+      const transactions = await storage.getAllCapitalTransactions();
+      res.json(transactions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch all capital transactions" });
+    }
+  });
+
   app.post("/api/owner-accounts/:id/transactions", requireOwner, async (req, res) => {
     try {
       const { type, amount, currency, safeId, description } = req.body;
@@ -2526,13 +2535,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (account) {
         const currentCapital = parseFloat(String(account.capitalBalance));
         const txAmount = parseFloat(String(amount));
-        const newCapital = type === "injection" ? currentCapital + txAmount : currentCapital - txAmount;
+        const newCapital = type === "injection" ? currentCapital + txAmount : Math.max(0, currentCapital - txAmount);
         await storage.updateOwnerAccount(req.params.id, { capitalBalance: String(newCapital) });
       }
       
       res.status(201).json(transaction);
     } catch (error) {
       res.status(500).json({ message: "Failed to create capital transaction" });
+    }
+  });
+
+  app.delete("/api/capital-transactions/:id", requireOwner, async (req, res) => {
+    try {
+      const result = await storage.deleteCapitalTransaction(req.params.id);
+      if (!result) return res.status(404).json({ message: "Transaction not found" });
+      res.json(result);
+    } catch (error: any) {
+      console.error("delete capital tx error:", error?.message);
+      res.status(500).json({ message: "Failed to delete capital transaction" });
+    }
+  });
+
+  app.delete("/api/owner-accounts/:id", requireOwner, async (req, res) => {
+    try {
+      const deleted = await storage.deleteOwnerAccount(req.params.id);
+      if (!deleted) return res.status(404).json({ message: "Owner account not found" });
+      res.json({ message: "Owner account deleted" });
+    } catch (error: any) {
+      console.error("delete owner account error:", error?.message);
+      res.status(500).json({ message: "Failed to delete owner account" });
     }
   });
 
