@@ -825,6 +825,88 @@ export default function Sales() {
         </>
         )}
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              {t("invoices")}
+            </CardTitle>
+            <CardDescription>{t("allSalesInvoices")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute ltr:left-3 rtl:right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder={t("searchInvoices")}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="ltr:pl-10 rtl:pr-10"
+                  data-testid="input-search-invoices"
+                />
+              </div>
+            </div>
+
+            {isLoading ? (
+              <div className="text-center py-8">{t("loading")}</div>
+            ) : filteredInvoices.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {t("noInvoicesFound")}
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("invoiceNumber")}</TableHead>
+                      <TableHead>{t("customerName")}</TableHead>
+                      <TableHead>{t("branch")}</TableHead>
+                      <TableHead>{t("items")}</TableHead>
+                      <TableHead>{t("total")}</TableHead>
+                      <TableHead>{t("date")}</TableHead>
+                      <TableHead>{t("actions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredInvoices.map(invoice => (
+                      <TableRow key={invoice.id}>
+                        <TableCell className="font-mono">{invoice.invoiceNumber}</TableCell>
+                        <TableCell>{invoice.customerName}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{invoice.branch}</Badge>
+                        </TableCell>
+                        <TableCell>{invoice.items.length}</TableCell>
+                        <TableCell className="font-semibold">{Number(invoice.totalAmount).toFixed(2)} LYD</TableCell>
+                        <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            <Button size="sm" variant="outline" onClick={() => handleView(invoice)} data-testid={`button-view-${invoice.id}`} title={t("invoiceDetails")}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handlePrint(invoice)} data-testid={`button-print-${invoice.id}`} title={t("print")}>
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(invoice)} data-testid={`button-edit-${invoice.id}`} title={t("editInvoice")}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleReturnClick(invoice)} data-testid={`button-return-${invoice.id}`} className="text-amber-600 hover:text-amber-700 border-amber-300">
+                              <RotateCcw className="h-4 w-4 mr-1" />
+                              <span>{t("returnProducts")}</span>
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleDeleteClick(invoice)} data-testid={`button-delete-${invoice.id}`} title={t("deleteInvoice")} className="text-red-600 hover:text-red-700">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {isOwner && (
         <Card className="border-blue-200 dark:border-blue-800">
           <CardHeader className="pb-3">
@@ -909,87 +991,6 @@ export default function Sales() {
         </Card>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              {t("invoices")}
-            </CardTitle>
-            <CardDescription>{t("allSalesInvoices")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4">
-              <div className="relative">
-                <Search className="absolute ltr:left-3 rtl:right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder={t("searchInvoices")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="ltr:pl-10 rtl:pr-10"
-                  data-testid="input-search-invoices"
-                />
-              </div>
-            </div>
-
-            {isLoading ? (
-              <div className="text-center py-8">{t("loading")}</div>
-            ) : filteredInvoices.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {t("noInvoicesFound")}
-              </div>
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("invoiceNumber")}</TableHead>
-                      <TableHead>{t("customerName")}</TableHead>
-                      <TableHead>{t("branch")}</TableHead>
-                      <TableHead>{t("items")}</TableHead>
-                      <TableHead>{t("total")}</TableHead>
-                      <TableHead>{t("date")}</TableHead>
-                      <TableHead>{t("actions")}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredInvoices.map(invoice => (
-                      <TableRow key={invoice.id}>
-                        <TableCell className="font-mono">{invoice.invoiceNumber}</TableCell>
-                        <TableCell>{invoice.customerName}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{invoice.branch}</Badge>
-                        </TableCell>
-                        <TableCell>{invoice.items.length}</TableCell>
-                        <TableCell className="font-semibold">{Number(invoice.totalAmount).toFixed(2)} LYD</TableCell>
-                        <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            <Button size="sm" variant="outline" onClick={() => handleView(invoice)} data-testid={`button-view-${invoice.id}`} title={t("invoiceDetails")}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handlePrint(invoice)} data-testid={`button-print-${invoice.id}`} title={t("print")}>
-                              <Printer className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleEdit(invoice)} data-testid={`button-edit-${invoice.id}`} title={t("editInvoice")}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleReturnClick(invoice)} data-testid={`button-return-${invoice.id}`} className="text-amber-600 hover:text-amber-700 border-amber-300">
-                              <RotateCcw className="h-4 w-4 mr-1" />
-                              <span>{t("returnProducts")}</span>
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleDeleteClick(invoice)} data-testid={`button-delete-${invoice.id}`} title={t("deleteInvoice")} className="text-red-600 hover:text-red-700">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
