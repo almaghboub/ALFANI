@@ -27,6 +27,7 @@ export default function Products() {
   const canManage = user?.role === "owner" || user?.role === "stock_manager";
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [filterMissingCostPrice, setFilterMissingCostPrice] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 50;
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -126,7 +127,8 @@ export default function Products() {
 
   const { data: productStats } = useQuery<{ total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number; totalCostValue: number; costByBranch: { ALFANI1: number; ALFANI2: number }; missingCostPriceCount: number }>({
     queryKey: ["/api/products/stats"],
-    staleTime: 10000,
+    staleTime: 3000,
+    refetchInterval: 15000,
   });
 
   const [suggestionSearch, setSuggestionSearch] = useState("");
@@ -357,7 +359,9 @@ export default function Products() {
     }
   };
 
-  const filteredProducts = products;
+  const filteredProducts = filterMissingCostPrice
+    ? products.filter(p => !p.costPrice || parseFloat(p.costPrice) === 0)
+    : products;
 
   return (
     <div className="flex-1 p-6 space-y-6">
@@ -395,9 +399,12 @@ export default function Products() {
                     <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("totalSellingPrice") || "Total Selling Price"}</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("totalSellingPrice")}</p>
                     <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400" data-testid="text-total-selling-value">
                       {productStats.totalSellingValue.toFixed(2)} LYD
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {t("inStockSellingValue") || "Qty in stock × selling price"}
                     </p>
                   </div>
                 </div>
@@ -411,16 +418,19 @@ export default function Products() {
                     <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("totalCostPrice") || "Total Cost Price"}</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("totalCostPrice")}</p>
                     <p className="text-xl font-bold text-blue-700 dark:text-blue-400" data-testid="text-total-cost-value">
                       {productStats.totalCostValue.toFixed(2)} LYD
                     </p>
-                    <div className="flex gap-4 mt-1">
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {t("inStockCostValue") || "Qty in stock × cost price"}
+                    </p>
+                    <div className="flex gap-4 mt-1.5">
                       <span className="text-xs text-muted-foreground">
-                        ALFANI 1: <span className="font-semibold text-blue-600">{productStats.costByBranch.ALFANI1.toFixed(2)}</span>
+                        ALFANI 1: <span className="font-semibold text-blue-600 dark:text-blue-400">{productStats.costByBranch.ALFANI1.toFixed(2)}</span>
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        ALFANI 2: <span className="font-semibold text-blue-600">{productStats.costByBranch.ALFANI2.toFixed(2)}</span>
+                        ALFANI 2: <span className="font-semibold text-blue-600 dark:text-blue-400">{productStats.costByBranch.ALFANI2.toFixed(2)}</span>
                       </span>
                     </div>
                   </div>
@@ -430,10 +440,32 @@ export default function Products() {
           </div>
 
           {productStats.missingCostPriceCount > 0 && (
-            <div className="flex items-center gap-3 p-3 rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/10">
-              <div className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                ⚠ {productStats.missingCostPriceCount} {t("productsMissingCostPrice") || "products are missing cost price — cost capital is underestimated"}
-              </div>
+            <button
+              onClick={() => {
+                setFilterMissingCostPrice(prev => !prev);
+                setCurrentPage(1);
+              }}
+              className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors text-left ${
+                filterMissingCostPrice
+                  ? "border-orange-400 dark:border-orange-600 bg-orange-100 dark:bg-orange-900/20"
+                  : "border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/10 hover:bg-orange-100 dark:hover:bg-orange-900/20"
+              }`}
+              data-testid="button-filter-missing-cost-price"
+            >
+              <span className="text-sm font-medium text-orange-700 dark:text-orange-400">
+                ⚠ {productStats.missingCostPriceCount} {t("productsMissingCostPrice")}
+              </span>
+              <span className="text-xs font-medium text-orange-600 dark:text-orange-400 underline underline-offset-2">
+                {filterMissingCostPrice ? t("clearFilter") : t("showMissingCostPrice")}
+              </span>
+            </button>
+          )}
+
+          {filterMissingCostPrice && productStats.missingCostPriceCount > 0 && (
+            <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400 font-medium px-1">
+              <span>◆</span>
+              <span>{t("missingCostPriceFilter")}</span>
+              <span className="text-muted-foreground">— {t("editProductToAddCostPrice") || "click Edit on a product to enter its cost price"}</span>
             </div>
           )}
         </div>

@@ -2152,7 +2152,7 @@ export class PostgreSQLStorage implements IStorage {
     }));
   }
 
-  private _statsCache: { data: { total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number } | null; timestamp: number } = { data: null, timestamp: 0 };
+  private _statsCache: { data: { total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number; totalCostValue: number; costByBranch: { ALFANI1: number; ALFANI2: number }; missingCostPriceCount: number } | null; timestamp: number } = { data: null, timestamp: 0 };
   private _totalCountCache: { count: number; timestamp: number } = { count: 0, timestamp: 0 };
 
   invalidateProductCaches() {
@@ -2363,6 +2363,9 @@ export class PostgreSQLStorage implements IStorage {
       }
 
       return { ...createdInvoice, items: createdItems };
+    }).then(result => {
+      this.invalidateProductCaches();
+      return result;
     });
   }
 
@@ -2419,6 +2422,9 @@ export class PostgreSQLStorage implements IStorage {
       const [updated] = await tx.update(salesInvoices).set(invoiceData).where(eq(salesInvoices.id, id)).returning();
       const items = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
       return { ...updated, items };
+    }).then(result => {
+      this.invalidateProductCaches();
+      return result;
     });
   }
 
@@ -2440,6 +2446,9 @@ export class PostgreSQLStorage implements IStorage {
       await tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
       await tx.delete(salesInvoices).where(eq(salesInvoices.id, id));
       return true;
+    }).then(result => {
+      this.invalidateProductCaches();
+      return result;
     });
   }
 
@@ -2502,6 +2511,9 @@ export class PostgreSQLStorage implements IStorage {
         .returning();
 
       return { ...updated, items: remainingItems };
+    }).then(result => {
+      this.invalidateProductCaches();
+      return result;
     });
   }
 
