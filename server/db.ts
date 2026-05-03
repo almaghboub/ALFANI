@@ -1033,6 +1033,306 @@ async function migrateProductsTable() {
       `);
     }
 
+    // ============ CREATE MISSING TABLES ============
+
+    // banks
+    const banksExists = await pool.query(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename='banks'`);
+    if (banksExists.rows.length === 0) {
+      console.log("Migrating: creating banks table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS banks (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          account_number TEXT,
+          currency TEXT NOT NULL DEFAULT 'USD',
+          balance_usd DECIMAL(15,2) NOT NULL DEFAULT 0,
+          balance_lyd DECIMAL(15,2) NOT NULL DEFAULT 0,
+          linked_safe_id VARCHAR REFERENCES safes(id),
+          description TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // bank_transactions
+    const bankTransExists = await pool.query(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename='bank_transactions'`);
+    if (bankTransExists.rows.length === 0) {
+      console.log("Migrating: creating bank_transactions table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS bank_transactions (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          bank_id VARCHAR NOT NULL REFERENCES banks(id),
+          type transaction_type NOT NULL,
+          amount_usd DECIMAL(15,2) NOT NULL DEFAULT 0,
+          amount_lyd DECIMAL(15,2) NOT NULL DEFAULT 0,
+          exchange_rate DECIMAL(10,4),
+          description TEXT,
+          reference_type TEXT,
+          reference_id VARCHAR,
+          created_by_user_id VARCHAR NOT NULL DEFAULT 'system',
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // currency_settlements
+    const currSettleExists = await pool.query(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename='currency_settlements'`);
+    if (currSettleExists.rows.length === 0) {
+      console.log("Migrating: creating currency_settlements table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS currency_settlements (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          safe_id VARCHAR REFERENCES safes(id),
+          bank_id VARCHAR REFERENCES banks(id),
+          previous_exchange_rate DECIMAL(10,4) NOT NULL,
+          new_exchange_rate DECIMAL(10,4) NOT NULL,
+          previous_value_lyd DECIMAL(15,2) NOT NULL,
+          new_value_lyd DECIMAL(15,2) NOT NULL,
+          difference_amount DECIMAL(15,2) NOT NULL,
+          is_gain BOOLEAN NOT NULL,
+          notes TEXT,
+          created_by_user_id VARCHAR NOT NULL DEFAULT 'system',
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // warehouses
+    const warehousesExists = await pool.query(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename='warehouses'`);
+    if (warehousesExists.rows.length === 0) {
+      console.log("Migrating: creating warehouses table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS warehouses (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          parent_id VARCHAR REFERENCES warehouses(id),
+          location TEXT,
+          linked_safe_id VARCHAR REFERENCES safes(id),
+          description TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // warehouse_stock
+    const warehouseStockExists = await pool.query(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename='warehouse_stock'`);
+    if (warehouseStockExists.rows.length === 0) {
+      console.log("Migrating: creating warehouse_stock table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS warehouse_stock (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          warehouse_id VARCHAR NOT NULL REFERENCES warehouses(id),
+          product_name TEXT NOT NULL,
+          product_code TEXT,
+          quantity INTEGER NOT NULL DEFAULT 0,
+          total_cost DECIMAL(15,2) NOT NULL DEFAULT 0,
+          average_cost DECIMAL(15,4) NOT NULL DEFAULT 0,
+          last_purchase_price DECIMAL(15,2),
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // main_office_account
+    const mainOfficeExists = await pool.query(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename='main_office_account'`);
+    if (mainOfficeExists.rows.length === 0) {
+      console.log("Migrating: creating main_office_account table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS main_office_account (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT NOT NULL DEFAULT 'Main Office',
+          total_assets DECIMAL(15,2) NOT NULL DEFAULT 0,
+          total_liabilities DECIMAL(15,2) NOT NULL DEFAULT 0,
+          total_revenue DECIMAL(15,2) NOT NULL DEFAULT 0,
+          total_expenses DECIMAL(15,2) NOT NULL DEFAULT 0,
+          last_reconciliation_date TIMESTAMP,
+          notes TEXT,
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // user_permissions
+    const userPermissionsExists = await pool.query(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename='user_permissions'`);
+    if (userPermissionsExists.rows.length === 0) {
+      console.log("Migrating: creating user_permissions table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_permissions (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id VARCHAR NOT NULL REFERENCES users(id),
+          permission TEXT NOT NULL,
+          is_granted BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // cashbox_reconciliations
+    const cashboxRecExists = await pool.query(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename='cashbox_reconciliations'`);
+    if (cashboxRecExists.rows.length === 0) {
+      console.log("Migrating: creating cashbox_reconciliations table...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS cashbox_reconciliations (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          safe_id VARCHAR NOT NULL REFERENCES safes(id),
+          system_balance_usd DECIMAL(15,2) NOT NULL,
+          system_balance_lyd DECIMAL(15,2) NOT NULL,
+          actual_balance_usd DECIMAL(15,2) NOT NULL,
+          actual_balance_lyd DECIMAL(15,2) NOT NULL,
+          difference_usd DECIMAL(15,2) NOT NULL,
+          difference_lyd DECIMAL(15,2) NOT NULL,
+          notes TEXT,
+          reconciled_by_user_id VARCHAR NOT NULL DEFAULT 'system',
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    }
+
+    // receipts (full schema version)
+    const receiptsFullExists = await pool.query(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename='receipts'`);
+    if (receiptsFullExists.rows.length > 0) {
+      // Add missing columns to existing receipts table
+      try {
+        const rCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='receipts'`);
+        const rColNames = rCols.rows.map((r: any) => r.column_name);
+        if (!rColNames.includes('customer_id')) await pool.query(`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS customer_id VARCHAR REFERENCES customers(id)`);
+        if (!rColNames.includes('supplier_id')) await pool.query(`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS supplier_id VARCHAR REFERENCES suppliers(id)`);
+        if (!rColNames.includes('bank_id')) await pool.query(`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS bank_id VARCHAR`);
+        if (!rColNames.includes('amount_usd')) await pool.query(`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS amount_usd DECIMAL(15,2) NOT NULL DEFAULT 0`);
+        if (!rColNames.includes('amount_lyd')) await pool.query(`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS amount_lyd DECIMAL(15,2) NOT NULL DEFAULT 0`);
+        if (!rColNames.includes('exchange_rate')) await pool.query(`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS exchange_rate DECIMAL(10,4)`);
+        if (!rColNames.includes('created_by_user_id')) await pool.query(`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR NOT NULL DEFAULT 'system'`);
+      } catch (e) { /* receipts column migration */ }
+    }
+
+    // ============ ADD MISSING COLUMNS TO EXISTING TABLES ============
+
+    // settings: add type, description, created_at columns
+    try {
+      const sCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='settings'`);
+      const sColNames = sCols.rows.map((r: any) => r.column_name);
+      if (!sColNames.includes('type')) await pool.query(`ALTER TABLE settings ADD COLUMN type TEXT NOT NULL DEFAULT 'string'`);
+      if (!sColNames.includes('description')) await pool.query(`ALTER TABLE settings ADD COLUMN description TEXT`);
+      if (!sColNames.includes('created_at')) await pool.query(`ALTER TABLE settings ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT NOW()`);
+    } catch (e) { console.error("settings column migration:", (e as any)?.message); }
+
+    // expenses: add transaction_type, person_name columns
+    try {
+      const eCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='expenses'`);
+      const eColNames = eCols.rows.map((r: any) => r.column_name);
+      if (!eColNames.includes('transaction_type')) await pool.query(`ALTER TABLE expenses ADD COLUMN transaction_type TEXT NOT NULL DEFAULT 'outgoing'`);
+      if (!eColNames.includes('person_name')) await pool.query(`ALTER TABLE expenses ADD COLUMN person_name TEXT NOT NULL DEFAULT ''`);
+    } catch (e) { console.error("expenses column migration:", (e as any)?.message); }
+
+    // expense_categories: add type column
+    try {
+      const ecCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='expense_categories'`);
+      const ecColNames = ecCols.rows.map((r: any) => r.column_name);
+      if (!ecColNames.includes('type')) await pool.query(`ALTER TABLE expense_categories ADD COLUMN type TEXT NOT NULL DEFAULT 'operational'`);
+    } catch (e) { console.error("expense_categories column migration:", (e as any)?.message); }
+
+    // delivery_tasks: add new schema columns
+    try {
+      const dtCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='delivery_tasks'`);
+      const dtColNames = dtCols.rows.map((r: any) => r.column_name);
+      if (!dtColNames.includes('assigned_to_user_id')) await pool.query(`ALTER TABLE delivery_tasks ADD COLUMN assigned_to_user_id VARCHAR NOT NULL DEFAULT 'system'`);
+      if (!dtColNames.includes('assigned_by_user_id')) await pool.query(`ALTER TABLE delivery_tasks ADD COLUMN assigned_by_user_id VARCHAR NOT NULL DEFAULT 'system'`);
+      if (!dtColNames.includes('pickup_location')) await pool.query(`ALTER TABLE delivery_tasks ADD COLUMN pickup_location TEXT`);
+      if (!dtColNames.includes('delivery_location')) await pool.query(`ALTER TABLE delivery_tasks ADD COLUMN delivery_location TEXT`);
+      if (!dtColNames.includes('payment_type')) await pool.query(`ALTER TABLE delivery_tasks ADD COLUMN payment_type TEXT`);
+      if (!dtColNames.includes('payment_amount')) await pool.query(`ALTER TABLE delivery_tasks ADD COLUMN payment_amount DECIMAL(10,2)`);
+      if (!dtColNames.includes('address')) await pool.query(`ALTER TABLE delivery_tasks ADD COLUMN address TEXT`);
+      if (!dtColNames.includes('value')) await pool.query(`ALTER TABLE delivery_tasks ADD COLUMN value DECIMAL(10,2)`);
+      if (!dtColNames.includes('weight')) await pool.query(`ALTER TABLE delivery_tasks ADD COLUMN weight DECIMAL(10,2)`);
+      if (!dtColNames.includes('updated_at')) await pool.query(`ALTER TABLE delivery_tasks ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT NOW()`);
+    } catch (e) { console.error("delivery_tasks column migration:", (e as any)?.message); }
+
+    // messages: add sender_id/recipient_id aliases
+    try {
+      const msgCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='messages'`);
+      const msgColNames = msgCols.rows.map((r: any) => r.column_name);
+      if (!msgColNames.includes('sender_id')) {
+        if (msgColNames.includes('from_user_id')) {
+          await pool.query(`ALTER TABLE messages ADD COLUMN sender_id VARCHAR REFERENCES users(id)`);
+          await pool.query(`UPDATE messages SET sender_id = from_user_id WHERE sender_id IS NULL`);
+        } else {
+          await pool.query(`ALTER TABLE messages ADD COLUMN sender_id VARCHAR NOT NULL DEFAULT 'system' REFERENCES users(id)`);
+        }
+      }
+      if (!msgColNames.includes('recipient_id')) {
+        if (msgColNames.includes('to_user_id')) {
+          await pool.query(`ALTER TABLE messages ADD COLUMN recipient_id VARCHAR REFERENCES users(id)`);
+          await pool.query(`UPDATE messages SET recipient_id = to_user_id WHERE recipient_id IS NULL`);
+        } else {
+          await pool.query(`ALTER TABLE messages ADD COLUMN recipient_id VARCHAR NOT NULL DEFAULT 'system' REFERENCES users(id)`);
+        }
+      }
+    } catch (e) { console.error("messages column migration:", (e as any)?.message); }
+
+    // order_images: add url, alt_text, position columns
+    try {
+      const oiCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='order_images'`);
+      const oiColNames = oiCols.rows.map((r: any) => r.column_name);
+      if (!oiColNames.includes('url')) {
+        if (oiColNames.includes('image_url')) {
+          await pool.query(`ALTER TABLE order_images ADD COLUMN url TEXT`);
+          await pool.query(`UPDATE order_images SET url = image_url WHERE url IS NULL`);
+          await pool.query(`ALTER TABLE order_images ALTER COLUMN url SET DEFAULT ''`);
+        } else {
+          await pool.query(`ALTER TABLE order_images ADD COLUMN url TEXT NOT NULL DEFAULT ''`);
+        }
+      }
+      if (!oiColNames.includes('alt_text')) await pool.query(`ALTER TABLE order_images ADD COLUMN alt_text TEXT`);
+      if (!oiColNames.includes('position')) await pool.query(`ALTER TABLE order_images ADD COLUMN position INTEGER NOT NULL DEFAULT 1`);
+    } catch (e) { console.error("order_images column migration:", (e as any)?.message); }
+
+    // orders: add missing columns for newer schema
+    try {
+      const oCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='orders'`);
+      const oColNames = oCols.rows.map((r: any) => r.column_name);
+      if (!oColNames.includes('down_payment_currency')) await pool.query(`ALTER TABLE orders ADD COLUMN down_payment_currency TEXT NOT NULL DEFAULT 'USD'`);
+      if (!oColNames.includes('shipping_down_payment')) await pool.query(`ALTER TABLE orders ADD COLUMN shipping_down_payment DECIMAL(10,2) NOT NULL DEFAULT 0`);
+      if (!oColNames.includes('shipping_down_payment_currency')) await pool.query(`ALTER TABLE orders ADD COLUMN shipping_down_payment_currency TEXT NOT NULL DEFAULT 'USD'`);
+      if (!oColNames.includes('shipping_weight')) await pool.query(`ALTER TABLE orders ADD COLUMN shipping_weight DECIMAL(10,2) NOT NULL DEFAULT 1`);
+      if (!oColNames.includes('shipping_country')) await pool.query(`ALTER TABLE orders ADD COLUMN shipping_country TEXT`);
+      if (!oColNames.includes('shipping_city')) await pool.query(`ALTER TABLE orders ADD COLUMN shipping_city TEXT`);
+      if (!oColNames.includes('shipping_category')) await pool.query(`ALTER TABLE orders ADD COLUMN shipping_category TEXT`);
+      if (!oColNames.includes('shipping_profit')) await pool.query(`ALTER TABLE orders ADD COLUMN shipping_profit DECIMAL(10,2) NOT NULL DEFAULT 0`);
+      if (!oColNames.includes('items_profit')) await pool.query(`ALTER TABLE orders ADD COLUMN items_profit DECIMAL(10,2) NOT NULL DEFAULT 0`);
+      if (!oColNames.includes('total_profit')) await pool.query(`ALTER TABLE orders ADD COLUMN total_profit DECIMAL(10,2) NOT NULL DEFAULT 0`);
+      if (!oColNames.includes('tracking_number')) await pool.query(`ALTER TABLE orders ADD COLUMN tracking_number TEXT`);
+      if (!oColNames.includes('darb_assabil_order_id')) await pool.query(`ALTER TABLE orders ADD COLUMN darb_assabil_order_id TEXT`);
+      if (!oColNames.includes('darb_assabil_reference')) await pool.query(`ALTER TABLE orders ADD COLUMN darb_assabil_reference TEXT`);
+      if (!oColNames.includes('revenue_account_id')) await pool.query(`ALTER TABLE orders ADD COLUMN revenue_account_id VARCHAR REFERENCES revenue_accounts(id)`);
+    } catch (e) { console.error("orders column migration:", (e as any)?.message); }
+
+    // customers: add balance_owed, notes columns  
+    try {
+      const custCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='customers'`);
+      const custColNames = custCols.rows.map((r: any) => r.column_name);
+      if (!custColNames.includes('balance_owed')) await pool.query(`ALTER TABLE customers ADD COLUMN balance_owed DECIMAL(15,2) NOT NULL DEFAULT 0`);
+      if (!custColNames.includes('notes')) await pool.query(`ALTER TABLE customers ADD COLUMN notes TEXT`);
+    } catch (e) { console.error("customers column migration:", (e as any)?.message); }
+
+    // order_items: add missing columns for newer schema
+    try {
+      const oiItemCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='order_items'`);
+      const oiItemColNames = oiItemCols.rows.map((r: any) => r.column_name);
+      if (!oiItemColNames.includes('product_code')) await pool.query(`ALTER TABLE order_items ADD COLUMN product_code TEXT`);
+      if (!oiItemColNames.includes('product_url')) await pool.query(`ALTER TABLE order_items ADD COLUMN product_url TEXT`);
+      if (!oiItemColNames.includes('original_price')) await pool.query(`ALTER TABLE order_items ADD COLUMN original_price DECIMAL(10,2)`);
+      if (!oiItemColNames.includes('discounted_price')) await pool.query(`ALTER TABLE order_items ADD COLUMN discounted_price DECIMAL(10,2)`);
+      if (!oiItemColNames.includes('markup_profit')) await pool.query(`ALTER TABLE order_items ADD COLUMN markup_profit DECIMAL(10,2) NOT NULL DEFAULT 0`);
+    } catch (e) { console.error("order_items column migration:", (e as any)?.message); }
+
     // Enable pg_trgm for fast text search on 100k+ products
     try {
       await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);

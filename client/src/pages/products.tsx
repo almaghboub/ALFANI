@@ -124,7 +124,7 @@ export default function Products() {
     enabled: canManage,
   });
 
-  const { data: productStats } = useQuery<{ total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number }>({
+  const { data: productStats } = useQuery<{ total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number; totalCostValue: number; costByBranch: { ALFANI1: number; ALFANI2: number }; missingCostPriceCount: number }>({
     queryKey: ["/api/products/stats"],
     staleTime: 10000,
   });
@@ -386,21 +386,57 @@ export default function Products() {
       </div>
 
       {user?.role === "owner" && productStats && (
-        <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("totalSellingPrice") || "Total Selling Price"}</p>
-                <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400" data-testid="text-total-selling-value">
-                  {productStats.totalSellingValue.toFixed(2)} LYD
-                </p>
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-emerald-500/10 rounded-xl flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("totalSellingPrice") || "Total Selling Price"}</p>
+                    <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400" data-testid="text-total-selling-value">
+                      {productStats.totalSellingValue.toFixed(2)} LYD
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-blue-500/10 rounded-xl flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("totalCostPrice") || "Total Cost Price"}</p>
+                    <p className="text-xl font-bold text-blue-700 dark:text-blue-400" data-testid="text-total-cost-value">
+                      {productStats.totalCostValue.toFixed(2)} LYD
+                    </p>
+                    <div className="flex gap-4 mt-1">
+                      <span className="text-xs text-muted-foreground">
+                        ALFANI 1: <span className="font-semibold text-blue-600">{productStats.costByBranch.ALFANI1.toFixed(2)}</span>
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        ALFANI 2: <span className="font-semibold text-blue-600">{productStats.costByBranch.ALFANI2.toFixed(2)}</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {productStats.missingCostPriceCount > 0 && (
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/10">
+              <div className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                ⚠ {productStats.missingCostPriceCount} {t("productsMissingCostPrice") || "products are missing cost price — cost capital is underestimated"}
               </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       )}
 
       <Card>
