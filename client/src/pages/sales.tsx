@@ -1145,9 +1145,10 @@ export default function Sales() {
                             </Button>
                             <Input
                               type="number"
-                              min={1}
+                              min={0.001}
+                              step="any"
                               value={item.quantity}
-                              onChange={(e) => handleEditQuantityChange(item.productId, parseInt(e.target.value) || 1)}
+                              onChange={(e) => handleEditQuantityChange(item.productId, parseFloat(e.target.value) || 0)}
                               className="w-16 text-center h-7"
                               data-testid={`input-edit-qty-${item.productId}`}
                             />
@@ -1321,10 +1322,11 @@ export default function Sales() {
                           <Input
                             type="number"
                             min={0}
-                            max={item.quantity}
+                            step="any"
+                            max={Number(item.quantity)}
                             value={returnQuantities[item.id] || 0}
                             onChange={(e) => {
-                              const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), item.quantity);
+                              const val = Math.min(Math.max(0, parseFloat(e.target.value) || 0), Number(item.quantity));
                               setReturnQuantities(prev => ({ ...prev, [item.id]: val }));
                             }}
                             className="w-20 text-center mx-auto"

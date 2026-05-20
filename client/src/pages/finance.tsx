@@ -90,7 +90,7 @@ export default function Finance() {
   const { toast } = useToast();
   const isRTL = i18n.language === "ar";
   const [currencyMode, setCurrencyMode] = useState<CurrencyMode>("USD");
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("safes");
   
   const [newSafeDialogOpen, setNewSafeDialogOpen] = useState(false);
   const [newBankDialogOpen, setNewBankDialogOpen] = useState(false);

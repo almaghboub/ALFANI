@@ -278,7 +278,7 @@ export const invoiceItems = pgTable("invoice_items", {
   invoiceId: varchar("invoice_id").notNull().references(() => salesInvoices.id, { onDelete: "cascade" }),
   productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   productName: text("product_name").notNull(),
-  quantity: integer("quantity").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
 });

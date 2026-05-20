@@ -14,7 +14,7 @@ const navigationItems = [
   { key: "salesHistory", href: "/sales", icon: History, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
   { key: "products", href: "/products", icon: Boxes, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
   { key: "inventory", href: "/inventory", icon: Warehouse, roles: ["owner", "customer_service", "receptionist", "stock_manager"] },
-  { key: "finance", href: "/finance", icon: Wallet, roles: ["owner"] },
+  { key: "cashbox", href: "/finance", icon: Wallet, roles: ["owner"] },
   { key: "profitReports", href: "/profits", icon: TrendingUp, roles: ["owner"] },
   { key: "expenses", href: "/expenses", icon: DollarSign, roles: ["owner"] },
   { key: "creditsDebts", href: "/credits", icon: CreditCard, roles: ["owner"] },

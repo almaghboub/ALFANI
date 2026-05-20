@@ -997,6 +997,20 @@ async function migrateProductsTable() {
       try { await pool.query(q); } catch (e) { /* constraint may conflict with existing data */ }
     }
 
+    // Migrate invoice_items.quantity from INTEGER to DECIMAL for fractional quantities
+    try {
+      const colType = await pool.query(`
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'invoice_items' AND column_name = 'quantity'
+      `);
+      if (colType.rows.length > 0 && colType.rows[0].data_type === 'integer') {
+        console.log("Migrating: changing invoice_items.quantity to DECIMAL(10,3)...");
+        await pool.query(`ALTER TABLE invoice_items ALTER COLUMN quantity TYPE DECIMAL(10,3) USING quantity::DECIMAL(10,3)`);
+      }
+    } catch (e: any) {
+      console.error("invoice_items quantity decimal migration error:", e?.message);
+    }
+
     // Idempotency keys table for deduplication
     const idempotencyExists = await pool.query(`
       SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'idempotency_keys'
