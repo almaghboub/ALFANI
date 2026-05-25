@@ -1604,32 +1604,39 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async createSafe(safe: InsertSafe): Promise<Safe> {
-    try {
-      const result = await db.insert(safes).values(safe).returning();
-      return result[0];
-    } catch (error: any) {
-      if (error?.message?.includes("relation") && error?.message?.includes("does not exist")) {
-        await pool.query(`
-          CREATE TABLE IF NOT EXISTS safes (
-            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-            name TEXT NOT NULL,
-            code TEXT NOT NULL UNIQUE,
-            parent_id VARCHAR REFERENCES safes(id),
-            currency TEXT NOT NULL DEFAULT 'USD',
-            is_multi_currency BOOLEAN NOT NULL DEFAULT false,
-            balance_usd DECIMAL(15,2) NOT NULL DEFAULT 0,
-            balance_lyd DECIMAL(15,2) NOT NULL DEFAULT 0,
-            description TEXT,
-            is_active BOOLEAN NOT NULL DEFAULT true,
-            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-          )
-        `);
-        const result = await db.insert(safes).values(safe).returning();
-        return result[0];
-      }
-      throw error;
-    }
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS safes (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        code TEXT NOT NULL UNIQUE,
+        parent_id VARCHAR REFERENCES safes(id),
+        currency TEXT NOT NULL DEFAULT 'USD',
+        is_multi_currency BOOLEAN NOT NULL DEFAULT false,
+        balance_usd DECIMAL(15,2) NOT NULL DEFAULT 0,
+        balance_lyd DECIMAL(15,2) NOT NULL DEFAULT 0,
+        description TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    const result = await pool.query(
+      `INSERT INTO safes (id, name, code, parent_id, currency, is_multi_currency, balance_usd, balance_lyd, description, is_active, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+       RETURNING *`,
+      [
+        safe.name,
+        safe.code,
+        safe.parentId || null,
+        safe.currency || 'USD',
+        safe.isMultiCurrency || false,
+        safe.balanceUSD || '0',
+        safe.balanceLYD || '0',
+        safe.description || null,
+        safe.isActive !== undefined ? safe.isActive : true,
+      ]
+    );
+    return result.rows[0] as Safe;
   }
 
   async updateSafe(id: string, safe: Partial<InsertSafe>): Promise<Safe | undefined> {
