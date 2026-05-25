@@ -161,20 +161,21 @@ export default function Invoice() {
 
   const addToCart = (product: ProductWithInventory) => {
     const branchInv = product.inventory.find(inv => inv.branch === branch);
-    const availableQty = branchInv?.quantity || 0;
+    const availableQty = Number(branchInv?.quantity || 0);
     
     const existingItem = cart.find(item => item.productId === product.id && item.branch === branch);
     const currentQty = existingItem?.quantity || 0;
     
-    if (currentQty >= availableQty) {
+    if (availableQty > 0 && currentQty >= availableQty) {
       toast({ title: t("error"), description: t("notEnoughStock"), variant: "destructive" });
       return;
     }
 
     if (existingItem) {
+      const nextQty = Math.round((currentQty + 1) * 1000) / 1000;
       setCart(cart.map(item => 
         (item.productId === product.id && item.branch === branch)
-          ? { ...item, quantity: item.quantity + 1, lineTotal: (item.quantity + 1) * item.unitPrice }
+          ? { ...item, quantity: nextQty, lineTotal: Math.round(nextQty * item.unitPrice * 100) / 100 }
           : item
       ));
     } else {
@@ -191,21 +192,22 @@ export default function Invoice() {
   };
 
   const updateQuantity = (productId: string, itemBranch: string, newQuantity: number) => {
-    if (newQuantity <= 0) {
+    const qty = Math.round(newQuantity * 1000) / 1000;
+    if (qty <= 0) {
       setCart(cart.filter(item => !(item.productId === productId && item.branch === itemBranch)));
     } else {
       const product = products.find(p => p.id === productId);
       const branchInv = product?.inventory.find(inv => inv.branch === itemBranch);
-      const availableQty = branchInv?.quantity || 0;
+      const availableQty = Number(branchInv?.quantity || 0);
       
-      if (newQuantity > availableQty) {
+      if (availableQty > 0 && qty > availableQty) {
         toast({ title: t("error"), description: t("notEnoughStock"), variant: "destructive" });
         return;
       }
       
       setCart(cart.map(item =>
         (item.productId === productId && item.branch === itemBranch)
-          ? { ...item, quantity: newQuantity, lineTotal: newQuantity * item.unitPrice }
+          ? { ...item, quantity: qty, lineTotal: Math.round(qty * item.unitPrice * 100) / 100 }
           : item
       ));
     }
@@ -870,12 +872,20 @@ export default function Invoice() {
                           <TableCell>{item.productName}</TableCell>
                           <TableCell><span className="inline-block px-2 py-0.5 text-xs font-medium rounded bg-muted">{item.branch}</span></TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button size="icon" variant="outline" onClick={() => updateQuantity(item.productId, item.branch, item.quantity - 1)}>
+                            <div className="flex items-center gap-1">
+                              <Button size="icon" variant="outline" className="h-7 w-7 shrink-0" onClick={() => updateQuantity(item.productId, item.branch, item.quantity - 0.5)}>
                                 <Minus className="h-3 w-3" />
                               </Button>
-                              <span>{item.quantity}</span>
-                              <Button size="icon" variant="outline" onClick={() => updateQuantity(item.productId, item.branch, item.quantity + 1)}>
+                              <Input
+                                type="number"
+                                min={0.001}
+                                step="any"
+                                value={item.quantity}
+                                onChange={(e) => updateQuantity(item.productId, item.branch, parseFloat(e.target.value) || 0)}
+                                className="w-20 h-7 text-center px-1"
+                                data-testid={`input-cart-qty-${item.productId}`}
+                              />
+                              <Button size="icon" variant="outline" className="h-7 w-7 shrink-0" onClick={() => updateQuantity(item.productId, item.branch, item.quantity + 0.5)}>
                                 <Plus className="h-3 w-3" />
                               </Button>
                             </div>

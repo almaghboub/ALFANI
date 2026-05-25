@@ -235,7 +235,7 @@ export const branchInventory = pgTable("branch_inventory", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   branch: branchEnum("branch").notNull(),
-  quantity: integer("quantity").notNull().default(0),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull().default("0"),
   lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
