@@ -119,6 +119,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Force-migrate endpoint: re-runs all DB migrations on the live server.
+  // Use this on Render if tables are missing without needing a full redeploy.
+  // Must be logged in as owner. Visit: /api/admin/force-migrate
+  app.post("/api/admin/force-migrate", requireOwner, async (_req, res) => {
+    try {
+      const { initializeDatabase } = await import("./db");
+      await initializeDatabase();
+      const tables = await pool.query(
+        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`
+      );
+      res.json({
+        success: true,
+        message: "Migrations completed successfully",
+        tables: tables.rows.map((r: any) => r.tablename),
+      });
+    } catch (error: any) {
+      console.error("Force-migrate error:", error);
+      res.status(500).json({ success: false, error: error?.message || String(error) });
+    }
+  });
+
   // Session configuration with PostgreSQL store (survives server restarts)
   const PgStore = pgSession(session);
   
