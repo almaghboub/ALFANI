@@ -2049,10 +2049,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (errMsg.includes("unique") || errMsg.includes("duplicate") || errCode === '23505') {
         return res.status(400).json({ message: "A safe with this code already exists" });
       }
-      if (errMsg.includes("relation") && errMsg.includes("does not exist")) {
-        return res.status(500).json({ message: "Database table not found. Please restart the server to run migrations." });
-      }
-      res.status(500).json({ message: `Failed to create safe: ${errMsg}` });
+      res.status(500).json({ message: `Safe error: ${errMsg} [code:${errCode}]` });
     }
   });
 
