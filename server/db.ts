@@ -109,6 +109,12 @@ export async function initializeDatabase() {
         if (!safeCols.includes('parent_id')) {
           await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS parent_id VARCHAR REFERENCES safes(id)`);
         }
+        if (!safeCols.includes('created_at')) {
+          await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW()`);
+        }
+        if (!safeCols.includes('updated_at')) {
+          await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW()`);
+        }
         // Add unique constraint on code if missing
         try {
           await pool.query(`ALTER TABLE safes ADD CONSTRAINT safes_code_unique UNIQUE (code)`);
