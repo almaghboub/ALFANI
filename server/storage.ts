@@ -1631,6 +1631,7 @@ export class PostgreSQLStorage implements IStorage {
     await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS parent_id VARCHAR`);
     await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW()`);
     await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW()`);
+    try { await pool.query(`ALTER TABLE safes ALTER COLUMN branch DROP NOT NULL`); } catch(e) {}
     try { await pool.query(`ALTER TABLE safes ADD CONSTRAINT safes_code_unique UNIQUE (code)`); } catch(e) {}
     const result = await pool.query(
       `INSERT INTO safes (id, name, code, parent_id, currency, is_multi_currency, balance_usd, balance_lyd, description, is_active, created_at, updated_at)
