@@ -2011,6 +2011,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/safes", requireOwner, async (req, res) => {
     try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS safes (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          parent_id VARCHAR REFERENCES safes(id),
+          currency TEXT NOT NULL DEFAULT 'USD',
+          is_multi_currency BOOLEAN NOT NULL DEFAULT false,
+          balance_usd DECIMAL(15,2) NOT NULL DEFAULT 0,
+          balance_lyd DECIMAL(15,2) NOT NULL DEFAULT 0,
+          description TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
       const body = { ...req.body };
       if (body.parentSafeId && body.parentSafeId !== "none") {
         body.parentId = body.parentSafeId;
