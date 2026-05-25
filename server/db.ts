@@ -63,10 +63,33 @@ export async function initializeDatabase() {
     if (result.rows[0].exists) {
       console.log("Database tables already exist, skipping initialization.");
       
+      // Always ensure safes table exists first (independent of migrateProductsTable)
+      try {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS safes (
+            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT NOT NULL,
+            code TEXT NOT NULL UNIQUE,
+            parent_id VARCHAR REFERENCES safes(id),
+            currency TEXT NOT NULL DEFAULT 'USD',
+            is_multi_currency BOOLEAN NOT NULL DEFAULT false,
+            balance_usd DECIMAL(15,2) NOT NULL DEFAULT 0,
+            balance_lyd DECIMAL(15,2) NOT NULL DEFAULT 0,
+            description TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT true,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+          )
+        `);
+        console.log("Ensured safes table exists.");
+      } catch (e: any) {
+        console.error("Error ensuring safes table:", e.message);
+      }
+
       try {
         await pool.query(`ALTER TABLE sales_invoices ADD COLUMN IF NOT EXISTS safe_id VARCHAR REFERENCES safes(id)`);
       } catch (e) {
-        // Column may already exist
+        // Column may already exist or safes not yet created
       }
       
       // Always run migrations to fix schema mismatches
