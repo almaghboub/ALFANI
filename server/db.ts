@@ -69,7 +69,7 @@ export async function initializeDatabase() {
           CREATE TABLE IF NOT EXISTS safes (
             id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
             name TEXT NOT NULL,
-            code TEXT NOT NULL UNIQUE,
+            code TEXT NOT NULL DEFAULT '',
             parent_id VARCHAR REFERENCES safes(id),
             currency TEXT NOT NULL DEFAULT 'USD',
             is_multi_currency BOOLEAN NOT NULL DEFAULT false,
@@ -81,7 +81,39 @@ export async function initializeDatabase() {
             updated_at TIMESTAMP NOT NULL DEFAULT NOW()
           )
         `);
-        console.log("Ensured safes table exists.");
+        // Add missing columns to safes table if they don't exist
+        const safeColsRes = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'safes'`);
+        const safeCols = safeColsRes.rows.map((r: any) => r.column_name);
+        if (!safeCols.includes('code')) {
+          await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS code TEXT NOT NULL DEFAULT ''`);
+          console.log("Migrated: added code column to safes");
+        }
+        if (!safeCols.includes('currency')) {
+          await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD'`);
+        }
+        if (!safeCols.includes('is_multi_currency')) {
+          await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS is_multi_currency BOOLEAN NOT NULL DEFAULT false`);
+        }
+        if (!safeCols.includes('balance_usd')) {
+          await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS balance_usd DECIMAL(15,2) NOT NULL DEFAULT 0`);
+        }
+        if (!safeCols.includes('balance_lyd')) {
+          await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS balance_lyd DECIMAL(15,2) NOT NULL DEFAULT 0`);
+        }
+        if (!safeCols.includes('description')) {
+          await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS description TEXT`);
+        }
+        if (!safeCols.includes('is_active')) {
+          await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true`);
+        }
+        if (!safeCols.includes('parent_id')) {
+          await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS parent_id VARCHAR REFERENCES safes(id)`);
+        }
+        // Add unique constraint on code if missing
+        try {
+          await pool.query(`ALTER TABLE safes ADD CONSTRAINT safes_code_unique UNIQUE (code)`);
+        } catch (e: any) { /* constraint already exists */ }
+        console.log("Ensured safes table and columns exist.");
       } catch (e: any) {
         console.error("Error ensuring safes table:", e.message);
       }

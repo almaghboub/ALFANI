@@ -1608,7 +1608,7 @@ export class PostgreSQLStorage implements IStorage {
       CREATE TABLE IF NOT EXISTS safes (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         name TEXT NOT NULL,
-        code TEXT NOT NULL UNIQUE,
+        code TEXT NOT NULL DEFAULT '',
         parent_id VARCHAR REFERENCES safes(id),
         currency TEXT NOT NULL DEFAULT 'USD',
         is_multi_currency BOOLEAN NOT NULL DEFAULT false,
@@ -1620,6 +1620,16 @@ export class PostgreSQLStorage implements IStorage {
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `);
+    // Add any missing columns to existing safes table
+    await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS code TEXT NOT NULL DEFAULT ''`);
+    await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD'`);
+    await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS is_multi_currency BOOLEAN NOT NULL DEFAULT false`);
+    await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS balance_usd DECIMAL(15,2) NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS balance_lyd DECIMAL(15,2) NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS description TEXT`);
+    await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true`);
+    await pool.query(`ALTER TABLE safes ADD COLUMN IF NOT EXISTS parent_id VARCHAR`);
+    try { await pool.query(`ALTER TABLE safes ADD CONSTRAINT safes_code_unique UNIQUE (code)`); } catch(e) {}
     const result = await pool.query(
       `INSERT INTO safes (id, name, code, parent_id, currency, is_multi_currency, balance_usd, balance_lyd, description, is_active, created_at, updated_at)
        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
