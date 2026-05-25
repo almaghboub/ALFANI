@@ -691,7 +691,7 @@ export default function Sales() {
   // Product sales excludes service fees (service fees are pass-through collected for service providers)
   const totalSales = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount) - (Number(inv.serviceAmount) || 0), 0);
   const totalServiceFees = invoices.reduce((sum, inv) => sum + (Number(inv.serviceAmount) || 0), 0);
-  const totalItems = invoices.reduce((sum, inv) => sum + inv.items.reduce((s, i) => s + i.quantity, 0), 0);
+  const totalItems = invoices.reduce((sum, inv) => sum + inv.items.reduce((s, i) => s + (parseFloat(String(i.quantity)) || 0), 0), 0);
 
   // Service fee period calculations
   const now = new Date();

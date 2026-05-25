@@ -174,7 +174,7 @@ export default function Products() {
     setShowSuggestions(false);
     setIsCreateDialogOpen(false);
     setSelectedProduct(product);
-    const totalQty = product.inventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
+    const totalQty = product.inventory?.reduce((sum, bi) => sum + (parseFloat(String(bi.quantity)) || 0), 0) || 0;
     setFormData({
       name: product.name,
       sku: product.sku || "",
@@ -327,7 +327,7 @@ export default function Products() {
 
   const handleEdit = (product: ProductWithInventory) => {
     setSelectedProduct(product);
-    const totalQty = product.inventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
+    const totalQty = product.inventory?.reduce((sum, bi) => sum + (parseFloat(String(bi.quantity)) || 0), 0) || 0;
     setFormData({
       name: product.name,
       sku: product.sku || "",
@@ -507,7 +507,7 @@ export default function Products() {
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>
                       {(() => {
-                        const totalQty = product.inventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
+                        const totalQty = product.inventory?.reduce((sum, bi) => sum + (parseFloat(String(bi.quantity)) || 0), 0) || 0;
                         return (
                           <span className={`font-semibold ${totalQty === 0 ? 'text-red-500' : totalQty <= 5 ? 'text-amber-500' : 'text-foreground'}`}>
                             {totalQty}
@@ -667,7 +667,7 @@ export default function Products() {
                     {t("existingProducts") || "Existing products"}
                   </div>
                   {nameSuggestions.map((product) => {
-                    const totalQty = product.inventory?.reduce((sum, bi) => sum + bi.quantity, 0) || 0;
+                    const totalQty = product.inventory?.reduce((sum, bi) => sum + (parseFloat(String(bi.quantity)) || 0), 0) || 0;
                     return (
                       <button
                         key={product.id}

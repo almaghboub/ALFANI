@@ -637,7 +637,7 @@ export default function Invoice() {
 
   const getAvailableQuantity = (product: ProductWithInventory) => {
     const branchInventory = product.inventory.find(inv => inv.branch === branch);
-    return branchInventory?.quantity || 0;
+    return parseFloat(String(branchInventory?.quantity || 0)) || 0;
   };
 
   return (

@@ -950,7 +950,7 @@ export default function Credits() {
                     .filter(p => !editItems.find(i => i.productId === p.id))
                     .map(product => {
                       const branchInv = product.inventory?.find((inv: any) => inv.branch === editBranch);
-                      const stock = branchInv?.quantity || 0;
+                      const stock = parseFloat(String(branchInv?.quantity || 0)) || 0;
                       return (
                         <button
                           key={product.id}

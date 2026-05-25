@@ -131,7 +131,7 @@ export default function Inventory() {
   const getTotalStock = (branch: Branch) => {
     return productsWithInventory.reduce((sum, product) => {
       const inv = getInventoryForBranch(product, branch);
-      return sum + (inv?.quantity || 0);
+      return sum + (parseFloat(String(inv?.quantity || 0)) || 0);
     }, 0);
   };
 
@@ -156,8 +156,8 @@ export default function Inventory() {
         </TableHeader>
         <TableBody>
           {branchProducts.map((product) => {
-            const quantity = product.branchInventory?.quantity || 0;
-            const threshold = product.branchInventory?.lowStockThreshold || 5;
+            const quantity = parseFloat(String(product.branchInventory?.quantity || 0)) || 0;
+            const threshold = parseFloat(String(product.branchInventory?.lowStockThreshold || 5)) || 5;
             const isLowStock = quantity > 0 && quantity <= threshold;
             const isOutOfStock = quantity === 0;
 
