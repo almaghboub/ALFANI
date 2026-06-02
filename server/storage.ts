@@ -299,7 +299,7 @@ export interface IStorage {
   getBranchInventory(productId: string): Promise<BranchInventory[]>;
   upsertBranchInventory(inventory: InsertBranchInventory): Promise<BranchInventory>;
   deleteBranchInventory(id: string): Promise<boolean>;
-  getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number; totalCostValue: number; sellingByBranch: { ALFANI1: number; ALFANI2: number }; costByBranch: { ALFANI1: number; ALFANI2: number }; missingCostPriceCount: number }>;
+  getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number; totalCostValue: number; sellingByBranch: { ALFANI1: number; ALFANI2: number }; costByBranch: { ALFANI1: number; ALFANI2: number }; missingCostPriceCount: number; totalStockByBranch: { ALFANI1: number; ALFANI2: number } }>;
   
   // Sales Invoices
   getAllInvoices(): Promise<SalesInvoiceWithItems[]>;
@@ -2264,7 +2264,7 @@ export class PostgreSQLStorage implements IStorage {
     };
   }
 
-  async getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number; totalCostValue: number; sellingByBranch: { ALFANI1: number; ALFANI2: number }; costByBranch: { ALFANI1: number; ALFANI2: number }; missingCostPriceCount: number }> {
+  async getProductStats(): Promise<{ total: number; active: number; lowStock: number; outOfStock: number; totalSellingValue: number; totalCostValue: number; sellingByBranch: { ALFANI1: number; ALFANI2: number }; costByBranch: { ALFANI1: number; ALFANI2: number }; missingCostPriceCount: number; totalStockByBranch: { ALFANI1: number; ALFANI2: number } }> {
     const now = Date.now();
     if (this._statsCache.data && now - this._statsCache.timestamp < 5000) {
       return this._statsCache.data;
@@ -2282,7 +2282,9 @@ export class PostgreSQLStorage implements IStorage {
         (SELECT COALESCE(SUM(CAST(p5.cost_price AS NUMERIC) * bi4.quantity), 0) FROM products p5 JOIN branch_inventory bi4 ON bi4.product_id = p5.id WHERE bi4.quantity > 0 AND bi4.branch = 'ALFANI2' AND p5.cost_price IS NOT NULL AND CAST(p5.cost_price AS NUMERIC) > 0) AS cost_alfani2,
         (SELECT COALESCE(SUM(CAST(p7.price AS NUMERIC) * bi6.quantity), 0) FROM products p7 JOIN branch_inventory bi6 ON bi6.product_id = p7.id WHERE bi6.quantity > 0 AND bi6.branch = 'ALFANI1' AND p7.price IS NOT NULL) AS selling_alfani1,
         (SELECT COALESCE(SUM(CAST(p8.price AS NUMERIC) * bi7.quantity), 0) FROM products p8 JOIN branch_inventory bi7 ON bi7.product_id = p8.id WHERE bi7.quantity > 0 AND bi7.branch = 'ALFANI2' AND p8.price IS NOT NULL) AS selling_alfani2,
-        (SELECT COUNT(DISTINCT p6.id) FROM products p6 JOIN branch_inventory bi5 ON bi5.product_id = p6.id WHERE bi5.quantity > 0 AND (p6.cost_price IS NULL OR CAST(p6.cost_price AS NUMERIC) = 0))::int AS missing_cost_price_count
+        (SELECT COUNT(DISTINCT p6.id) FROM products p6 JOIN branch_inventory bi5 ON bi5.product_id = p6.id WHERE bi5.quantity > 0 AND (p6.cost_price IS NULL OR CAST(p6.cost_price AS NUMERIC) = 0))::int AS missing_cost_price_count,
+        (SELECT COALESCE(SUM(bi8.quantity), 0) FROM branch_inventory bi8 WHERE bi8.branch = 'ALFANI1' AND bi8.quantity > 0) AS stock_alfani1,
+        (SELECT COALESCE(SUM(bi9.quantity), 0) FROM branch_inventory bi9 WHERE bi9.branch = 'ALFANI2' AND bi9.quantity > 0) AS stock_alfani2
       FROM products p
       LEFT JOIN (
         SELECT product_id, SUM(quantity) AS total_qty, MIN(low_stock_threshold) AS min_threshold
@@ -2307,6 +2309,10 @@ export class PostgreSQLStorage implements IStorage {
         ALFANI2: Number(row.cost_alfani2) || 0,
       },
       missingCostPriceCount: Number(row.missing_cost_price_count) || 0,
+      totalStockByBranch: {
+        ALFANI1: Number(row.stock_alfani1) || 0,
+        ALFANI2: Number(row.stock_alfani2) || 0,
+      },
     };
     this._statsCache = { data: stats, timestamp: now };
     return stats;

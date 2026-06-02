@@ -1665,7 +1665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Branch is required (ALFANI1 or ALFANI2)" });
       }
       
-      const qty = parseInt(initialQuantity) || 0;
+      const qty = parseFloat(initialQuantity) || 0;
       if (qty < 0) {
         return res.status(400).json({ message: "Initial quantity cannot be negative" });
       }
@@ -1748,7 +1748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const oldBranchRecord = existingInventory.find(inv => inv.branch === otherBranch);
 
         if (oldBranchRecord) {
-          const qty = initialQuantity !== undefined ? parseInt(initialQuantity) || 0 : oldBranchRecord.quantity;
+          const qty = initialQuantity !== undefined ? parseFloat(initialQuantity) || 0 : oldBranchRecord.quantity;
           await storage.upsertBranchInventory({
             productId: product.id,
             branch,
@@ -1760,7 +1760,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.upsertBranchInventory({
             productId: product.id,
             branch,
-            quantity: parseInt(initialQuantity) || 0,
+            quantity: parseFloat(initialQuantity) || 0,
             lowStockThreshold: 5,
           });
         }

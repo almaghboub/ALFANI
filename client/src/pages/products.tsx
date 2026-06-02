@@ -229,8 +229,9 @@ export default function Products() {
       resetForm();
       toast({ title: t("success"), description: t("productUpdated") });
     },
-    onError: () => {
-      toast({ title: t("error"), description: t("failedUpdateProduct"), variant: "destructive" });
+    onError: (error: any) => {
+      const msg = error?.message?.replace(/^\d+:\s*/, "") || t("failedUpdateProduct");
+      toast({ title: t("error"), description: msg, variant: "destructive" });
     },
   });
 
@@ -744,7 +745,7 @@ export default function Products() {
                   type="number"
                   min="0"
                   value={formData.initialQuantity || 0}
-                  onChange={(e) => setFormData({ ...formData, initialQuantity: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setFormData({ ...formData, initialQuantity: parseFloat(e.target.value) || 0 })}
                   data-testid="input-product-initial-quantity"
                 />
               </div>
@@ -856,7 +857,7 @@ export default function Products() {
                   type="number"
                   min="1"
                   value={stockInData.quantity}
-                  onChange={(e) => setStockInData({ ...stockInData, quantity: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setStockInData({ ...stockInData, quantity: parseFloat(e.target.value) || 0 })}
                   data-testid="input-stockin-quantity"
                 />
               </div>

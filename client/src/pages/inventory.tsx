@@ -73,6 +73,7 @@ export default function Inventory() {
     totalSellingValue: number; totalCostValue: number;
     sellingByBranch: { ALFANI1: number; ALFANI2: number };
     costByBranch: { ALFANI1: number; ALFANI2: number };
+    totalStockByBranch: { ALFANI1: number; ALFANI2: number };
   }>({
     queryKey: ["/api/products/stats"],
     staleTime: 15000,
@@ -217,7 +218,7 @@ export default function Inventory() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {getTotalStock("ALFANI1") + getTotalStock("ALFANI2")}
+              {((productStats?.totalStockByBranch?.ALFANI1 || 0) + (productStats?.totalStockByBranch?.ALFANI2 || 0)).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 })}
             </div>
             <p className="text-xs text-muted-foreground">{t("acrossAllBranches")}</p>
           </CardContent>
@@ -336,11 +337,11 @@ export default function Inventory() {
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="ALFANI1" data-testid="tab-alfani1">
                 ALFANI1
-                <Badge variant="secondary" className="ml-2">{getTotalStock("ALFANI1")}</Badge>
+                <Badge variant="secondary" className="ml-2">{(productStats?.totalStockByBranch?.ALFANI1 || 0).toLocaleString("en-US", { maximumFractionDigits: 3 })}</Badge>
               </TabsTrigger>
               <TabsTrigger value="ALFANI2" data-testid="tab-alfani2">
                 ALFANI2
-                <Badge variant="secondary" className="ml-2">{getTotalStock("ALFANI2")}</Badge>
+                <Badge variant="secondary" className="ml-2">{(productStats?.totalStockByBranch?.ALFANI2 || 0).toLocaleString("en-US", { maximumFractionDigits: 3 })}</Badge>
               </TabsTrigger>
             </TabsList>
             <TabsContent value="ALFANI1">
@@ -418,7 +419,7 @@ export default function Inventory() {
                 type="number"
                 min="0"
                 value={stockFormData.quantity}
-                onChange={(e) => setStockFormData({ ...stockFormData, quantity: parseInt(e.target.value) || 0 })}
+                onChange={(e) => setStockFormData({ ...stockFormData, quantity: parseFloat(e.target.value) || 0 })}
                 data-testid="input-stock-quantity"
               />
             </div>
