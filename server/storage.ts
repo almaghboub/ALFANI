@@ -2354,7 +2354,25 @@ export class PostgreSQLStorage implements IStorage {
 
   async createInvoice(invoice: InsertSalesInvoice, items: InsertInvoiceItem[], itemBranches?: string[]): Promise<SalesInvoiceWithItems> {
     return await db.transaction(async (tx) => {
-      const invoiceResult = await tx.insert(salesInvoices).values(invoice).returning();
+      // Acquire advisory lock so concurrent requests can't generate the same invoice number
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('invoice_number_gen'))`);
+
+      // Generate invoice number safely inside the transaction
+      const today = new Date();
+      const datePrefix = `INV-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+      const maxResult = await tx.execute(
+        sql`SELECT invoice_number FROM sales_invoices WHERE invoice_number LIKE ${datePrefix + '%'} ORDER BY invoice_number DESC LIMIT 1`
+      );
+      let nextNum = 1;
+      if (maxResult.rows && maxResult.rows.length > 0) {
+        const lastNum = (maxResult.rows[0] as any).invoice_number as string;
+        const parts = lastNum.split('-');
+        const lastSeq = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(lastSeq)) nextNum = lastSeq + 1;
+      }
+      const invoiceNumber = `${datePrefix}-${String(nextNum).padStart(4, '0')}`;
+
+      const invoiceResult = await tx.insert(salesInvoices).values({ ...invoice, invoiceNumber }).returning();
       const createdInvoice = invoiceResult[0];
 
       const itemsWithInvoiceId = items.map(item => ({

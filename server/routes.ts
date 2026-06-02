@@ -2749,8 +2749,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         item.unitPrice = price;
       }
       
-      const invoiceNumber = await storage.generateInvoiceNumber();
-      
       const itemsData = items.map((item: any) => {
         const lineTotal = item.quantity * item.unitPrice;
         return {
@@ -2781,7 +2779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paymentType = req.body.paymentType || "cash";
       const isCredit = paymentType === "credit";
       const invoiceData: any = {
-        invoiceNumber,
+        invoiceNumber: "", // generated atomically inside createInvoice transaction
         customerName: customerName.trim(),
         branch,
         subtotal: String(subtotal),
@@ -2806,11 +2804,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const item of items) {
         logOperation('invoice_create_item', invoice.id, item.productId, item.quantity,
-          { invoiceNumber, customerName: customerName.trim(), unitPrice: item.unitPrice, branch: item.branch || branch },
+          { invoiceNumber: invoice.invoiceNumber, customerName: customerName.trim(), unitPrice: item.unitPrice, branch: item.branch || branch },
           null, userId);
       }
       logOperation('invoice_create', invoice.id, null, null,
-        { invoiceNumber, customerName: customerName.trim(), totalAmount, branch, itemCount: items.length, paymentType },
+        { invoiceNumber: invoice.invoiceNumber, customerName: customerName.trim(), totalAmount, branch, itemCount: items.length, paymentType },
         null, userId);
 
       if (safeId && !isCredit) {
@@ -2820,7 +2818,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             type: 'deposit',
             amountUSD: "0",
             amountLYD: String(totalAmount),
-            description: `Sale: ${invoiceNumber} - ${customerName.trim()}`,
+            description: `Sale: ${invoice.invoiceNumber} - ${customerName.trim()}`,
             referenceType: 'invoice',
             referenceId: invoice.id,
             createdByUserId: userId || 'system',
