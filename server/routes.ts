@@ -2998,7 +2998,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!existingInvoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
-      if (user.role !== 'owner' && existingInvoice.createdByUserId !== user.id) {
+      if (user.role !== 'owner' && existingInvoice.createdByUserId && existingInvoice.createdByUserId !== user.id) {
         return res.status(403).json({ message: "Not authorized to return items from this invoice" });
       }
 
@@ -3007,7 +3007,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!invoiceItem) {
           return res.status(400).json({ message: `Item ${ret.itemId} not found in invoice` });
         }
-        if (ret.quantity > invoiceItem.quantity) {
+        if (ret.quantity > Number(invoiceItem.quantity)) {
           return res.status(400).json({ message: `Return quantity (${ret.quantity}) exceeds sold quantity (${invoiceItem.quantity}) for ${invoiceItem.productName}` });
         }
       }

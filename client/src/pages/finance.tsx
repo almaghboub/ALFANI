@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Wallet, Landmark, Receipt, Package,
   Plus, ArrowUpRight, ArrowDownLeft, RefreshCw, TrendingUp, TrendingDown,
-  DollarSign, Banknote, Scale, UserCircle, History, Search, Trash2, AlertTriangle, ChevronDown, ChevronRight
+  DollarSign, Banknote, Scale, UserCircle, History, Search, Trash2, AlertTriangle, ChevronDown, ChevronRight, Pencil
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -100,6 +100,12 @@ export default function Finance() {
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
   const [reconciliationDialogOpen, setReconciliationDialogOpen] = useState(false);
   const [selectedReconcileSafe, setSelectedReconcileSafe] = useState<string>("");
+  const [editSafeDialogOpen, setEditSafeDialogOpen] = useState(false);
+  const [safeToEdit, setSafeToEdit] = useState<Safe | null>(null);
+  const [editSafeName, setEditSafeName] = useState("");
+  const [editSafeCode, setEditSafeCode] = useState("");
+  const [deleteSafeConfirmOpen, setDeleteSafeConfirmOpen] = useState(false);
+  const [safeToDelete, setSafeToDelete] = useState<Safe | null>(null);
   const [ownerAccountDialogOpen, setOwnerAccountDialogOpen] = useState(false);
   const [capitalTxDialogOpen, setCapitalTxDialogOpen] = useState(false);
   const [selectedOwnerAccount, setSelectedOwnerAccount] = useState<string>("");
@@ -263,6 +269,39 @@ export default function Finance() {
         if (parsed.message) msg = parsed.message;
       } catch {}
       toast({ title: t("error") || "Error", description: msg, variant: "destructive" });
+    },
+  });
+
+  const updateSafeMutation = useMutation({
+    mutationFn: async ({ id, name, code }: { id: string; name: string; code: string }) => {
+      const response = await apiRequest("PATCH", `/api/safes/${id}`, { name, code });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
+      setEditSafeDialogOpen(false);
+      setSafeToEdit(null);
+      toast({ title: t("updated") || "Updated", description: t("safeUpdated") || "Safe updated successfully" });
+    },
+    onError: () => {
+      toast({ title: t("error") || "Error", description: t("failedToUpdateSafe") || "Failed to update safe", variant: "destructive" });
+    },
+  });
+
+  const deleteSafeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/safes/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
+      setDeleteSafeConfirmOpen(false);
+      setSafeToDelete(null);
+      toast({ title: t("deleted") || "Deleted", description: t("safeDeleted") || "Safe deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: t("error") || "Error", description: t("failedToDeleteSafe") || "Failed to delete safe", variant: "destructive" });
     },
   });
 
@@ -869,18 +908,45 @@ export default function Finance() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedSafe(safe);
-                              setSafeTransactionDialogOpen(true);
-                            }}
-                            data-testid={`button-add-transaction-${safe.id}`}
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            {t("transaction") || "Transaction"}
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedSafe(safe);
+                                setSafeTransactionDialogOpen(true);
+                              }}
+                              data-testid={`button-add-transaction-${safe.id}`}
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              {t("transaction") || "Transaction"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSafeToEdit(safe);
+                                setEditSafeName(safe.name);
+                                setEditSafeCode(safe.code);
+                                setEditSafeDialogOpen(true);
+                              }}
+                              data-testid={`button-edit-safe-${safe.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive hover:text-destructive border-destructive/30 hover:border-destructive"
+                              onClick={() => {
+                                setSafeToDelete(safe);
+                                setDeleteSafeConfirmOpen(true);
+                              }}
+                              data-testid={`button-delete-safe-${safe.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -948,6 +1014,78 @@ export default function Finance() {
               </form>
             </DialogContent>
           </Dialog>
+
+          {/* Edit Safe Dialog */}
+          <Dialog open={editSafeDialogOpen} onOpenChange={setEditSafeDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t("editSafe") || "Edit Safe"}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>{t("safeName") || "Safe Name"}</Label>
+                  <Input
+                    value={editSafeName}
+                    onChange={(e) => setEditSafeName(e.target.value)}
+                    data-testid="input-edit-safe-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("safeCode") || "Safe Code"}</Label>
+                  <Input
+                    value={editSafeCode}
+                    onChange={(e) => setEditSafeCode(e.target.value)}
+                    data-testid="input-edit-safe-code"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditSafeDialogOpen(false)}>
+                  {t("cancel") || "Cancel"}
+                </Button>
+                <Button
+                  disabled={updateSafeMutation.isPending || !editSafeName.trim() || !editSafeCode.trim()}
+                  onClick={() => {
+                    if (safeToEdit) {
+                      updateSafeMutation.mutate({ id: safeToEdit.id, name: editSafeName.trim(), code: editSafeCode.trim() });
+                    }
+                  }}
+                  data-testid="button-confirm-edit-safe"
+                >
+                  {updateSafeMutation.isPending ? t("saving") || "Saving..." : t("save") || "Save"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Safe Confirmation Dialog */}
+          <Dialog open={deleteSafeConfirmOpen} onOpenChange={setDeleteSafeConfirmOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-5 w-5" />
+                  {t("deleteSafe") || "Delete Safe"}
+                </DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                {t("deleteSafeConfirm") || "Are you sure you want to delete"} <strong>{safeToDelete?.name}</strong>? {t("actionCannotBeUndone") || "This action cannot be undone."}
+              </p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteSafeConfirmOpen(false)}>
+                  {t("cancel") || "Cancel"}
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={deleteSafeMutation.isPending}
+                  onClick={() => safeToDelete && deleteSafeMutation.mutate(safeToDelete.id)}
+                  data-testid="button-confirm-delete-safe"
+                >
+                  {deleteSafeMutation.isPending ? t("deleting") || "Deleting..." : t("delete") || "Delete"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
         </TabsContent>
 
         <TabsContent value="banks" className="space-y-4">

@@ -188,8 +188,8 @@ export default function Sales() {
       setReturnQuantities({});
       toast({ title: t("returnSuccess") });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to process return", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Error", description: error?.message || "Failed to process return", variant: "destructive" });
     },
   });
 
