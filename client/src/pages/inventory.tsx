@@ -68,7 +68,12 @@ export default function Inventory() {
   const totalProducts = paginatedData?.total || 0;
   const totalPages = paginatedData?.totalPages || 1;
 
-  const { data: productStats } = useQuery<{ total: number; active: number; lowStock: number; outOfStock: number }>({
+  const { data: productStats } = useQuery<{
+    total: number; active: number; lowStock: number; outOfStock: number;
+    totalSellingValue: number; totalCostValue: number;
+    sellingByBranch: { ALFANI1: number; ALFANI2: number };
+    costByBranch: { ALFANI1: number; ALFANI2: number };
+  }>({
     queryKey: ["/api/products/stats"],
     staleTime: 15000,
   });
@@ -240,6 +245,67 @@ export default function Inventory() {
               {getOutOfStockCount("ALFANI1") + getOutOfStockCount("ALFANI2")}
             </div>
             <p className="text-xs text-muted-foreground">{t("requiresRestock")}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Selling & Cost Value by Branch */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="border-blue-200 dark:border-blue-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-400">
+              إجمالي سعر البيع
+            </CardTitle>
+            <CardDescription className="text-xs">القيمة الإجمالية بسعر البيع</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">ALFANI 1</span>
+              <span className="text-lg font-bold text-blue-700 dark:text-blue-400">
+                {(productStats?.sellingByBranch?.ALFANI1 || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-normal">LYD</span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">ALFANI 2</span>
+              <span className="text-lg font-bold text-blue-700 dark:text-blue-400">
+                {(productStats?.sellingByBranch?.ALFANI2 || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-normal">LYD</span>
+              </span>
+            </div>
+            <div className="border-t pt-2 flex justify-between items-center">
+              <span className="text-sm font-medium">الإجمالي</span>
+              <span className="text-base font-bold">
+                {(productStats?.totalSellingValue || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-normal">LYD</span>
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-green-200 dark:border-green-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-green-700 dark:text-green-400">
+              إجمالي سعر التكلفة
+            </CardTitle>
+            <CardDescription className="text-xs">القيمة الإجمالية بسعر التكلفة</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">ALFANI 1</span>
+              <span className="text-lg font-bold text-green-700 dark:text-green-400">
+                {(productStats?.costByBranch?.ALFANI1 || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-normal">LYD</span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">ALFANI 2</span>
+              <span className="text-lg font-bold text-green-700 dark:text-green-400">
+                {(productStats?.costByBranch?.ALFANI2 || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-normal">LYD</span>
+              </span>
+            </div>
+            <div className="border-t pt-2 flex justify-between items-center">
+              <span className="text-sm font-medium">الإجمالي</span>
+              <span className="text-base font-bold">
+                {(productStats?.totalCostValue || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-normal">LYD</span>
+              </span>
+            </div>
           </CardContent>
         </Card>
       </div>
