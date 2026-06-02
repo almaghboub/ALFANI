@@ -110,6 +110,14 @@ export default function Finance() {
   const [capitalTxDialogOpen, setCapitalTxDialogOpen] = useState(false);
   const [selectedOwnerAccount, setSelectedOwnerAccount] = useState<string>("");
   const [transactionSearchQuery, setTransactionSearchQuery] = useState("");
+  const [safeTxType, setSafeTxType] = useState("deposit");
+  const [safeTxAmountUSD, setSafeTxAmountUSD] = useState("");
+  const [safeTxAmountLYD, setSafeTxAmountLYD] = useState("");
+  const [safeTxDescription, setSafeTxDescription] = useState("");
+  const [bankTxType, setBankTxType] = useState("deposit");
+  const [bankTxAmountUSD, setBankTxAmountUSD] = useState("");
+  const [bankTxAmountLYD, setBankTxAmountLYD] = useState("");
+  const [bankTxDescription, setBankTxDescription] = useState("");
   const [expandedPartner, setExpandedPartner] = useState<string | null>(null);
 
   const { data: summary, isLoading: summaryLoading } = useQuery<FinancialSummary>({
@@ -956,32 +964,20 @@ export default function Finance() {
             </CardContent>
           </Card>
 
-          <Dialog open={safeTransactionDialogOpen} onOpenChange={setSafeTransactionDialogOpen}>
+          <Dialog open={safeTransactionDialogOpen} onOpenChange={(open) => {
+            setSafeTransactionDialogOpen(open);
+            if (!open) { setSafeTxType("deposit"); setSafeTxAmountUSD(""); setSafeTxAmountLYD(""); setSafeTxDescription(""); }
+          }}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>
                   {t("addTransaction") || "Add Transaction"} - {selectedSafe?.name}
                 </DialogTitle>
               </DialogHeader>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
-                  if (selectedSafe) {
-                    createSafeTransactionMutation.mutate({
-                      safeId: selectedSafe.id,
-                      type: formData.get("type") as string,
-                      amountUSD: formData.get("amountUSD") as string || undefined,
-                      amountLYD: formData.get("amountLYD") as string || undefined,
-                      description: formData.get("description") as string || undefined,
-                    });
-                  }
-                }}
-                className="space-y-4"
-              >
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="type">{t("transactionType") || "Transaction Type"}</Label>
-                  <Select name="type" required>
+                  <Label>{t("transactionType") || "Transaction Type"}</Label>
+                  <Select value={safeTxType} onValueChange={setSafeTxType}>
                     <SelectTrigger data-testid="select-transaction-type">
                       <SelectValue placeholder={t("selectType") || "Select type"} />
                     </SelectTrigger>
@@ -995,23 +991,36 @@ export default function Finance() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="amountUSD">{t("amountUSD") || "Amount (USD)"}</Label>
-                    <Input id="amountUSD" name="amountUSD" type="number" step="0.01" data-testid="input-amount-usd" />
+                    <Input id="amountUSD" type="number" step="0.01" value={safeTxAmountUSD} onChange={e => setSafeTxAmountUSD(e.target.value)} data-testid="input-amount-usd" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="amountLYD">{t("amountLYD") || "Amount (LYD)"}</Label>
-                    <Input id="amountLYD" name="amountLYD" type="number" step="0.01" data-testid="input-amount-lyd" />
+                    <Input id="amountLYD" type="number" step="0.01" value={safeTxAmountLYD} onChange={e => setSafeTxAmountLYD(e.target.value)} data-testid="input-amount-lyd" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="description">{t("description") || "Description"}</Label>
-                  <Input id="description" name="description" data-testid="input-description" />
+                  <Label htmlFor="safeTxDescription">{t("description") || "Description"}</Label>
+                  <Input id="safeTxDescription" value={safeTxDescription} onChange={e => setSafeTxDescription(e.target.value)} data-testid="input-description" />
                 </div>
                 <DialogFooter>
-                  <Button type="submit" disabled={createSafeTransactionMutation.isPending} data-testid="button-submit-transaction">
+                  <Button
+                    onClick={() => {
+                      if (!selectedSafe || !safeTxType) return;
+                      createSafeTransactionMutation.mutate({
+                        safeId: selectedSafe.id,
+                        type: safeTxType,
+                        amountUSD: safeTxAmountUSD || undefined,
+                        amountLYD: safeTxAmountLYD || undefined,
+                        description: safeTxDescription || undefined,
+                      });
+                    }}
+                    disabled={createSafeTransactionMutation.isPending}
+                    data-testid="button-submit-transaction"
+                  >
                     {createSafeTransactionMutation.isPending ? t("saving") || "Saving..." : t("save") || "Save"}
                   </Button>
                 </DialogFooter>
-              </form>
+              </div>
             </DialogContent>
           </Dialog>
 
@@ -1212,32 +1221,20 @@ export default function Finance() {
             </CardContent>
           </Card>
 
-          <Dialog open={bankTransactionDialogOpen} onOpenChange={setBankTransactionDialogOpen}>
+          <Dialog open={bankTransactionDialogOpen} onOpenChange={(open) => {
+            setBankTransactionDialogOpen(open);
+            if (!open) { setBankTxType("deposit"); setBankTxAmountUSD(""); setBankTxAmountLYD(""); setBankTxDescription(""); }
+          }}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>
                   {t("addTransaction") || "Add Transaction"} - {selectedBank?.name}
                 </DialogTitle>
               </DialogHeader>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
-                  if (selectedBank) {
-                    createBankTransactionMutation.mutate({
-                      bankId: selectedBank.id,
-                      type: formData.get("type") as string,
-                      amountUSD: formData.get("amountUSD") as string || undefined,
-                      amountLYD: formData.get("amountLYD") as string || undefined,
-                      description: formData.get("description") as string || undefined,
-                    });
-                  }
-                }}
-                className="space-y-4"
-              >
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="bankTxType">{t("transactionType") || "Transaction Type"}</Label>
-                  <Select name="type" required>
+                  <Label>{t("transactionType") || "Transaction Type"}</Label>
+                  <Select value={bankTxType} onValueChange={setBankTxType}>
                     <SelectTrigger data-testid="select-bank-transaction-type">
                       <SelectValue placeholder={t("selectType") || "Select type"} />
                     </SelectTrigger>
@@ -1251,23 +1248,36 @@ export default function Finance() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="bankAmountUSD">{t("amountUSD") || "Amount (USD)"}</Label>
-                    <Input id="bankAmountUSD" name="amountUSD" type="number" step="0.01" data-testid="input-bank-amount-usd" />
+                    <Input id="bankAmountUSD" type="number" step="0.01" value={bankTxAmountUSD} onChange={e => setBankTxAmountUSD(e.target.value)} data-testid="input-bank-amount-usd" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="bankAmountLYD">{t("amountLYD") || "Amount (LYD)"}</Label>
-                    <Input id="bankAmountLYD" name="amountLYD" type="number" step="0.01" data-testid="input-bank-amount-lyd" />
+                    <Input id="bankAmountLYD" type="number" step="0.01" value={bankTxAmountLYD} onChange={e => setBankTxAmountLYD(e.target.value)} data-testid="input-bank-amount-lyd" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="bankDescription">{t("description") || "Description"}</Label>
-                  <Input id="bankDescription" name="description" data-testid="input-bank-description" />
+                  <Label htmlFor="bankTxDescription">{t("description") || "Description"}</Label>
+                  <Input id="bankTxDescription" value={bankTxDescription} onChange={e => setBankTxDescription(e.target.value)} data-testid="input-bank-description" />
                 </div>
                 <DialogFooter>
-                  <Button type="submit" disabled={createBankTransactionMutation.isPending} data-testid="button-submit-bank-transaction">
+                  <Button
+                    onClick={() => {
+                      if (!selectedBank || !bankTxType) return;
+                      createBankTransactionMutation.mutate({
+                        bankId: selectedBank.id,
+                        type: bankTxType,
+                        amountUSD: bankTxAmountUSD || undefined,
+                        amountLYD: bankTxAmountLYD || undefined,
+                        description: bankTxDescription || undefined,
+                      });
+                    }}
+                    disabled={createBankTransactionMutation.isPending}
+                    data-testid="button-submit-bank-transaction"
+                  >
                     {createBankTransactionMutation.isPending ? t("saving") || "Saving..." : t("save") || "Save"}
                   </Button>
                 </DialogFooter>
-              </form>
+              </div>
             </DialogContent>
           </Dialog>
         </TabsContent>
