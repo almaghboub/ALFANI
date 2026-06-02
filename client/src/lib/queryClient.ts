@@ -3,10 +3,13 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     if (res.status === 401 && !res.url.includes("/api/auth/")) {
-      throw new Error("Session expired");
+      window.location.reload();
+      throw new Error("Session expired. Please log in again.");
     }
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let message = text;
+    try { message = JSON.parse(text)?.message || text; } catch {}
+    throw new Error(message || res.statusText);
   }
 }
 

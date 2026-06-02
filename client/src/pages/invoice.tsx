@@ -130,6 +130,10 @@ export default function Invoice() {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
+        if (res.status === 401) {
+          setTimeout(() => window.location.reload(), 1500);
+          throw new Error("Session expired. Please log in again.");
+        }
         throw new Error(json?.message || `Error ${res.status}`);
       }
       return json;

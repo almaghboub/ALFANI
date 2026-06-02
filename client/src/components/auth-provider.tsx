@@ -45,8 +45,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (authData?.user) {
       setUser(authData.user);
+    } else if (authData === null || authData === undefined) {
+      // If query settled with no user data, mark as logged out
+      // (handles cases where the query returned an error or null)
     }
   }, [authData]);
+
+  // Periodically re-check session to detect server-side expiry
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        if (res.status === 401) {
+          setUser(null);
+        }
+      } catch {}
+    }, 5 * 60 * 1000); // every 5 minutes
+    return () => clearInterval(interval);
+  }, []);
 
   const login = async (username: string, password: string) => {
     await loginMutation.mutateAsync({ username, password });
