@@ -1819,7 +1819,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Missing required fields: productId, branch, quantity, costPerUnit, purchaseType" });
       }
 
-      const qty = parseInt(quantity);
+      const qty = parseFloat(quantity);
       const unitCost = parseFloat(costPerUnit);
       if (qty <= 0 || unitCost < 0) {
         return res.status(400).json({ message: "Quantity must be positive and cost cannot be negative" });

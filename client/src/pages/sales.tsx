@@ -155,8 +155,8 @@ export default function Sales() {
       setInvoiceToDelete(null);
       toast({ title: t("invoiceDeleted") });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to delete invoice", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Error", description: error?.message || "Failed to delete invoice", variant: "destructive" });
     },
   });
 

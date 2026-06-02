@@ -68,6 +68,7 @@ export default function Expenses() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/financial-summary"] });
       toast({ title: t('success'), description: t('expenseDeletedSuccess') });
     },
     onError: () => {

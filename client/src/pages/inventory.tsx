@@ -86,13 +86,14 @@ export default function Inventory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/stats"] });
       setIsAddStockDialogOpen(false);
       setSelectedProduct(null);
       setStockFormData({ quantity: 0, lowStockThreshold: 5 });
       toast({ title: t("success"), description: t("inventoryUpdated") });
     },
-    onError: () => {
-      toast({ title: t("error"), description: t("failedUpdateInventory"), variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: t("error"), description: error?.message || t("failedUpdateInventory"), variant: "destructive" });
     },
   });
 

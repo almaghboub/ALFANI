@@ -197,6 +197,7 @@ export default function Products() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/stats"] });
       setIsCreateDialogOpen(false);
       resetForm();
       toast({ title: t("success"), description: t("productCreated") });
@@ -224,6 +225,7 @@ export default function Products() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/stats"] });
       setIsEditDialogOpen(false);
       setSelectedProduct(null);
       resetForm();
@@ -242,6 +244,7 @@ export default function Products() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/stats"] });
       setIsDeleteDialogOpen(false);
       setSelectedProduct(null);
       toast({ title: t("success"), description: t("productDeleted") });
@@ -259,6 +262,7 @@ export default function Products() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["/api/products/with-inventory"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/products/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/safe-transactions"] });

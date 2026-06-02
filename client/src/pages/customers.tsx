@@ -110,10 +110,10 @@ export default function Customers() {
         shippingCode: "",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: t("error"),
-        description: t("failedCreateCustomer"),
+        description: error?.message || t("failedCreateCustomer"),
         variant: "destructive",
       });
     },
