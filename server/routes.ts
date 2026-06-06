@@ -107,7 +107,7 @@ declare global {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Database diagnostics endpoint (owner-only, helps debug production issues)
+  // Database diagnostics endpoint (no auth needed — read-only)
   app.get("/api/db-check", async (_req, res) => {
     try {
       const tables = await pool.query(`
@@ -116,27 +116,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ tables: tables.rows.map((r: any) => r.tablename) });
     } catch (error: any) {
       res.status(500).json({ error: error?.message || String(error) });
-    }
-  });
-
-  // Force-migrate endpoint: re-runs all DB migrations on the live server.
-  // Use this on Render if tables are missing without needing a full redeploy.
-  // Must be logged in as owner. Visit: /api/admin/force-migrate
-  app.post("/api/admin/force-migrate", requireOwner, async (_req, res) => {
-    try {
-      const { initializeDatabase } = await import("./db");
-      await initializeDatabase();
-      const tables = await pool.query(
-        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`
-      );
-      res.json({
-        success: true,
-        message: "Migrations completed successfully",
-        tables: tables.rows.map((r: any) => r.tablename),
-      });
-    } catch (error: any) {
-      console.error("Force-migrate error:", error);
-      res.status(500).json({ success: false, error: error?.message || String(error) });
     }
   });
 
@@ -226,6 +205,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(passport.initialize());
   app.use(passport.session());
+
+  // Force-migrate endpoint: re-runs all DB migrations on the live server.
+  // Placed AFTER passport/session init so req.isAuthenticated() works.
+  // Must be logged in as owner. Call: POST /api/admin/force-migrate
+  app.post("/api/admin/force-migrate", requireOwner, async (_req, res) => {
+    try {
+      const { initializeDatabase } = await import("./db");
+      await initializeDatabase();
+      const tables = await pool.query(
+        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`
+      );
+      res.json({
+        success: true,
+        message: "Migrations completed successfully",
+        tables: tables.rows.map((r: any) => r.tablename),
+      });
+    } catch (error: any) {
+      console.error("Force-migrate error:", error);
+      res.status(500).json({ success: false, error: error?.message || String(error) });
+    }
+  });
 
   // Authentication routes
   app.post("/api/auth/login", (req, res, next) => {

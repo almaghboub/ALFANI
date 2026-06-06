@@ -705,6 +705,15 @@ async function migrateProductsTable() {
         if (!stColNames.includes('created_by_user_id')) {
           await pool.query(`ALTER TABLE safe_transactions ADD COLUMN created_by_user_id VARCHAR NOT NULL DEFAULT 'system'`);
         }
+        if (!stColNames.includes('exchange_rate')) {
+          await pool.query(`ALTER TABLE safe_transactions ADD COLUMN exchange_rate DECIMAL(10,4)`);
+        }
+        if (!stColNames.includes('reference_type')) {
+          await pool.query(`ALTER TABLE safe_transactions ADD COLUMN reference_type TEXT`);
+        }
+        if (!stColNames.includes('reference_id')) {
+          await pool.query(`ALTER TABLE safe_transactions ADD COLUMN reference_id VARCHAR`);
+        }
       } catch (e) { /* migration may already be done */ }
     }
 
@@ -1165,6 +1174,28 @@ async function migrateProductsTable() {
           created_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
       `);
+    } else {
+      // Add missing columns to existing bank_transactions
+      try {
+        const btCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'bank_transactions'`);
+        const btColNames = btCols.rows.map((r: any) => r.column_name);
+        if (!btColNames.includes('amount_usd')) {
+          await pool.query(`ALTER TABLE bank_transactions ADD COLUMN amount_usd DECIMAL(15,2) NOT NULL DEFAULT 0`);
+          await pool.query(`ALTER TABLE bank_transactions ADD COLUMN amount_lyd DECIMAL(15,2) NOT NULL DEFAULT 0`);
+        }
+        if (!btColNames.includes('exchange_rate')) {
+          await pool.query(`ALTER TABLE bank_transactions ADD COLUMN exchange_rate DECIMAL(10,4)`);
+        }
+        if (!btColNames.includes('reference_type')) {
+          await pool.query(`ALTER TABLE bank_transactions ADD COLUMN reference_type TEXT`);
+        }
+        if (!btColNames.includes('reference_id')) {
+          await pool.query(`ALTER TABLE bank_transactions ADD COLUMN reference_id VARCHAR`);
+        }
+        if (!btColNames.includes('created_by_user_id')) {
+          await pool.query(`ALTER TABLE bank_transactions ADD COLUMN created_by_user_id VARCHAR NOT NULL DEFAULT 'system'`);
+        }
+      } catch (e) { /* migration may already be done */ }
     }
 
     // currency_settlements
