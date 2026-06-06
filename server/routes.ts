@@ -2108,12 +2108,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdByUserId: req.user!.id,
       });
       if (!result.success) {
+        console.error("Safe transaction validation error:", JSON.stringify(result.error.errors));
         return res.status(400).json({ message: "Invalid transaction data", errors: result.error.errors });
       }
       const transaction = await storage.createSafeTransaction(result.data);
       res.status(201).json(transaction);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to create safe transaction" });
+    } catch (error: any) {
+      console.error("Safe transaction error:", error?.message || error);
+      res.status(500).json({ message: "Failed to create safe transaction", detail: error?.message });
     }
   });
 
