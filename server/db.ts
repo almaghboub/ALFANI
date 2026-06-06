@@ -714,6 +714,10 @@ async function migrateProductsTable() {
         if (!stColNames.includes('reference_id')) {
           await pool.query(`ALTER TABLE safe_transactions ADD COLUMN reference_id VARCHAR`);
         }
+        // If the legacy 'amount' column exists (NOT NULL, no default), set a default so new inserts work
+        if (stColNames.includes('amount')) {
+          await pool.query(`ALTER TABLE safe_transactions ALTER COLUMN amount SET DEFAULT 0`);
+        }
       } catch (e) { /* migration may already be done */ }
     }
 
@@ -1194,6 +1198,10 @@ async function migrateProductsTable() {
         }
         if (!btColNames.includes('created_by_user_id')) {
           await pool.query(`ALTER TABLE bank_transactions ADD COLUMN created_by_user_id VARCHAR NOT NULL DEFAULT 'system'`);
+        }
+        // If legacy 'amount' column exists (NOT NULL, no default), set default so new inserts work
+        if (btColNames.includes('amount')) {
+          await pool.query(`ALTER TABLE bank_transactions ALTER COLUMN amount SET DEFAULT 0`);
         }
       } catch (e) { /* migration may already be done */ }
     }

@@ -48,6 +48,7 @@ export const safeTransactions = pgTable("safe_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   safeId: varchar("safe_id").notNull().references(() => safes.id),
   type: transactionTypeEnum("type").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).default("0"),
   amountUSD: decimal("amount_usd", { precision: 15, scale: 2 }).notNull().default("0"),
   amountLYD: decimal("amount_lyd", { precision: 15, scale: 2 }).notNull().default("0"),
   exchangeRate: decimal("exchange_rate", { precision: 10, scale: 4 }),
