@@ -2102,6 +2102,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = insertSafeTransactionSchema.safeParse({
         ...req.body,
+        amountUSD: req.body.amountUSD || "0",
+        amountLYD: req.body.amountLYD || "0",
         safeId: req.params.safeId,
         createdByUserId: req.user!.id,
       });
@@ -2176,6 +2178,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = insertBankTransactionSchema.safeParse({
         ...req.body,
+        amountUSD: req.body.amountUSD || "0",
+        amountLYD: req.body.amountLYD || "0",
         bankId: req.params.bankId,
         createdByUserId: req.user!.id,
       });
