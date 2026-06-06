@@ -1422,6 +1422,49 @@ async function migrateProductsTable() {
       if (!oiItemColNames.includes('markup_profit')) await pool.query(`ALTER TABLE order_items ADD COLUMN markup_profit DECIMAL(10,2) NOT NULL DEFAULT 0`);
     } catch (e) { console.error("order_items column migration:", (e as any)?.message); }
 
+    // ============ DATABASE-LEVEL CONSTRAINTS ============
+
+    // 1. Unique constraint: prevent duplicate product entries within the same invoice
+    try {
+      await pool.query(`
+        DO $$ BEGIN
+          ALTER TABLE invoice_items ADD CONSTRAINT invoice_items_invoice_product_unique UNIQUE (invoice_id, product_id);
+        EXCEPTION WHEN duplicate_table THEN NULL;
+                 WHEN duplicate_object THEN NULL;
+        END $$;
+      `);
+    } catch (e) { /* constraint may already exist */ }
+
+    // 2. CHECK: invoice_items.quantity must be > 0
+    try {
+      await pool.query(`
+        DO $$ BEGIN
+          ALTER TABLE invoice_items ADD CONSTRAINT invoice_items_quantity_positive CHECK (quantity > 0) NOT VALID;
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+      `);
+    } catch (e) { /* constraint may already exist */ }
+
+    // 3. CHECK: invoice_items.line_total must be >= 0
+    try {
+      await pool.query(`
+        DO $$ BEGIN
+          ALTER TABLE invoice_items ADD CONSTRAINT invoice_items_line_total_nonneg CHECK (line_total >= 0) NOT VALID;
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+      `);
+    } catch (e) { /* constraint may already exist */ }
+
+    // 4. CHECK: branch_inventory.quantity must be >= 0
+    try {
+      await pool.query(`
+        DO $$ BEGIN
+          ALTER TABLE branch_inventory ADD CONSTRAINT branch_inventory_quantity_nonneg CHECK (quantity >= 0) NOT VALID;
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+      `);
+    } catch (e) { /* constraint may already exist */ }
+
     // Enable pg_trgm for fast text search on 100k+ products
     try {
       await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
