@@ -2652,7 +2652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalCost = calcCost(filteredInvoices);
       const totalProfit = totalSales - totalCost;
       const totalItems = filteredInvoices.reduce((sum, inv) => 
-        sum + inv.items.reduce((s, i) => s + i.quantity, 0), 0);
+        sum + inv.items.reduce((s, i) => s + Number(i.quantity), 0), 0);
       const invoiceCount = filteredInvoices.length;
       const avgOrderValue = invoiceCount > 0 ? totalSales / invoiceCount : 0;
 
@@ -2666,7 +2666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           profit: branch1.reduce((s, i) => s + productSales(i), 0) - calcCost(branch1),
           serviceFees: branch1.reduce((s, i) => s + (Number(i.serviceAmount) || 0), 0),
           count: branch1.length,
-          items: branch1.reduce((s, inv) => s + inv.items.reduce((is, item) => is + item.quantity, 0), 0),
+          items: branch1.reduce((s, inv) => s + inv.items.reduce((is, item) => is + Number(item.quantity), 0), 0),
         },
         ALFANI2: {
           sales: branch2.reduce((s, i) => s + productSales(i), 0),
@@ -2674,7 +2674,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           profit: branch2.reduce((s, i) => s + productSales(i), 0) - calcCost(branch2),
           serviceFees: branch2.reduce((s, i) => s + (Number(i.serviceAmount) || 0), 0),
           count: branch2.length,
-          items: branch2.reduce((s, inv) => s + inv.items.reduce((is, item) => is + item.quantity, 0), 0),
+          items: branch2.reduce((s, inv) => s + inv.items.reduce((is, item) => is + Number(item.quantity), 0), 0),
         },
       };
       
