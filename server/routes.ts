@@ -37,7 +37,9 @@ import {
   loginSchema,
 } from "@shared/schema";
 import { darbAssabilService } from "./services/darbAssabil";
-import { pool } from "./db";
+import { pool, db } from "./db";
+import { eq } from "drizzle-orm";
+import { safeTransactions as safeTransactionsTable, expenses as expensesTable, safes as safesTable } from "@shared/schema";
 
 async function logOperation(
   operation: string,
@@ -1488,48 +1490,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         safeId: safeId || null,
         currency: currency || "USD",
         transactionType: transactionType || "outgoing",
+        description: expenseData.description ?? "",
         date: expenseData.date ? new Date(expenseData.date) : new Date(),
       });
       if (!result.success) {
         return res.status(400).json({ message: "Invalid expense data", errors: result.error.errors });
       }
 
-      const expense = await storage.createExpense(result.data);
-      
-      // Deduct from safe if safeId is provided
-      if (safeId) {
-        const safes = await storage.getAllSafes();
-        const safe = safes.find(s => s.id === safeId);
-        if (safe) {
-          const amount = parseFloat(expenseData.amount);
-          const isOutgoing = transactionType !== "incoming";
-          const user = req.user as any;
-          
-          if (currency === "LYD") {
-            await storage.createSafeTransaction({
+      const user = req.user as any;
+
+      // Wrap expense + safe transaction in a single DB transaction so they
+      // either both commit or both roll back — no more partial saves.
+      const expense = await db.transaction(async (tx) => {
+        const [createdExpense] = await tx.insert(expensesTable).values(result.data).returning();
+
+        if (safeId) {
+          const safeRows = await tx.select().from(safesTable).where(eq(safesTable.id, safeId)).limit(1);
+          if (safeRows.length > 0) {
+            const safe = safeRows[0];
+            const amount = parseFloat(expenseData.amount);
+            const isOutgoing = transactionType !== "incoming";
+            const txType = isOutgoing ? "withdrawal" : "deposit";
+            const description = `Expense: ${expenseData.personName} - ${expenseData.category}`;
+
+            const amountUSD = currency === "USD" ? String(amount) : "0";
+            const amountLYD = currency === "LYD" ? String(amount) : "0";
+
+            await tx.insert(safeTransactionsTable).values({
               safeId,
-              type: isOutgoing ? "withdrawal" : "deposit",
-              amountUSD: "0",
-              amountLYD: String(amount),
-              description: `Expense: ${expenseData.personName} - ${expenseData.category}`,
+              type: txType,
+              amountUSD,
+              amountLYD,
+              description,
               createdByUserId: user.id,
             });
-          } else {
-            await storage.createSafeTransaction({
-              safeId,
-              type: isOutgoing ? "withdrawal" : "deposit",
-              amountUSD: String(amount),
-              amountLYD: "0",
-              description: `Expense: ${expenseData.personName} - ${expenseData.category}`,
-              createdByUserId: user.id,
-            });
+
+            // Update safe balance
+            const newBalanceUSD = Number(safe.balanceUSD) + (Number(amountUSD) * (isOutgoing ? -1 : 1));
+            const newBalanceLYD = Number(safe.balanceLYD) + (Number(amountLYD) * (isOutgoing ? -1 : 1));
+            await tx.update(safesTable)
+              .set({ balanceUSD: String(newBalanceUSD), balanceLYD: String(newBalanceLYD), updatedAt: new Date() })
+              .where(eq(safesTable.id, safeId));
           }
         }
-      }
+
+        return createdExpense;
+      });
 
       res.status(201).json(expense);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to create expense" });
+    } catch (error: any) {
+      console.error("Create expense error:", error?.message || error);
+      res.status(500).json({ message: "Failed to create expense", detail: error?.message });
     }
   });
 

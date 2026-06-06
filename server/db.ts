@@ -1352,12 +1352,14 @@ async function migrateProductsTable() {
       if (!sColNames.includes('created_at')) await pool.query(`ALTER TABLE settings ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT NOW()`);
     } catch (e) { console.error("settings column migration:", (e as any)?.message); }
 
-    // expenses: add transaction_type, person_name columns
+    // expenses: add transaction_type, person_name columns; relax NOT NULL on description
     try {
       const eCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='expenses'`);
       const eColNames = eCols.rows.map((r: any) => r.column_name);
       if (!eColNames.includes('transaction_type')) await pool.query(`ALTER TABLE expenses ADD COLUMN transaction_type TEXT NOT NULL DEFAULT 'outgoing'`);
       if (!eColNames.includes('person_name')) await pool.query(`ALTER TABLE expenses ADD COLUMN person_name TEXT NOT NULL DEFAULT ''`);
+      // description was originally NOT NULL — make it nullable so optional field inserts don't fail
+      await pool.query(`ALTER TABLE expenses ALTER COLUMN description DROP NOT NULL`);
     } catch (e) { console.error("expenses column migration:", (e as any)?.message); }
 
     // expense_categories: add type column
