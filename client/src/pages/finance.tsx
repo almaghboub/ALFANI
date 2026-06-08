@@ -15,7 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Wallet, Landmark, Receipt, Package,
   Plus, ArrowUpRight, ArrowDownLeft, RefreshCw, TrendingUp, TrendingDown,
-  DollarSign, Banknote, Scale, UserCircle, History, Search, Trash2, AlertTriangle, ChevronDown, ChevronRight, Pencil
+  DollarSign, Banknote, Scale, UserCircle, History, Search, Trash2, AlertTriangle, ChevronDown, ChevronRight, Pencil,
+  RotateCcw, ShoppingCart
 } from "lucide-react";
 import { format } from "date-fns";
 
