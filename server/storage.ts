@@ -1661,8 +1661,23 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async deleteSafe(id: string): Promise<boolean> {
-    const result = await db.delete(safes).where(eq(safes.id, id)).returning();
-    return result.length > 0;
+    return await db.transaction(async (tx) => {
+      const existing = await tx.select().from(safes).where(eq(safes.id, id));
+      if (existing.length === 0) return false;
+
+      // Null out safe_id in all referencing tables so FK constraints don't block deletion
+      await tx.execute(sql`UPDATE sales_invoices SET safe_id = NULL WHERE safe_id = ${id}`);
+      await tx.execute(sql`UPDATE expenses SET safe_id = NULL WHERE safe_id = ${id}`);
+      await tx.execute(sql`UPDATE stock_purchases SET safe_id = NULL WHERE safe_id = ${id}`);
+      await tx.execute(sql`UPDATE capital_transactions SET safe_id = NULL WHERE safe_id = ${id}`);
+      await tx.execute(sql`UPDATE credit_payments SET safe_id = NULL WHERE safe_id = ${id}`);
+      await tx.execute(sql`UPDATE safes SET parent_id = NULL WHERE parent_id = ${id}`);
+      // Delete safe_transactions (safe_id is NOT NULL so can't be nulled)
+      await tx.execute(sql`DELETE FROM safe_transactions WHERE safe_id = ${id}`);
+
+      const result = await tx.delete(safes).where(eq(safes.id, id)).returning();
+      return result.length > 0;
+    });
   }
 
   async getSafeTransactions(safeId: string): Promise<SafeTransaction[]> {
