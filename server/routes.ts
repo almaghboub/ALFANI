@@ -2085,7 +2085,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ message: "Safe deleted successfully" });
     } catch (error: any) {
-      console.error("Delete safe error:", error?.message);
+      const msg = error?.message || "";
+      if (msg === "safeHasBalance") {
+        return res.status(400).json({ message: "safeHasBalance" });
+      }
+      console.error("Delete safe error:", msg);
       res.status(500).json({ message: "Failed to delete safe" });
     }
   });

@@ -1665,14 +1665,20 @@ export class PostgreSQLStorage implements IStorage {
       const existing = await tx.select().from(safes).where(eq(safes.id, id));
       if (existing.length === 0) return false;
 
-      // Null out safe_id in all referencing tables so FK constraints don't block deletion
+      const safe = existing[0];
+      const usdBalance = Math.abs(Number(safe.balanceUSD || 0));
+      const lydBalance = Math.abs(Number(safe.balanceLYD || 0));
+      if (usdBalance > 0.001 || lydBalance > 0.001) {
+        throw new Error("safeHasBalance");
+      }
+
+      // Balance is zero — clear all FK references then delete
       await tx.execute(sql`UPDATE sales_invoices SET safe_id = NULL WHERE safe_id = ${id}`);
       await tx.execute(sql`UPDATE expenses SET safe_id = NULL WHERE safe_id = ${id}`);
       await tx.execute(sql`UPDATE stock_purchases SET safe_id = NULL WHERE safe_id = ${id}`);
       await tx.execute(sql`UPDATE capital_transactions SET safe_id = NULL WHERE safe_id = ${id}`);
       await tx.execute(sql`UPDATE credit_payments SET safe_id = NULL WHERE safe_id = ${id}`);
       await tx.execute(sql`UPDATE safes SET parent_id = NULL WHERE parent_id = ${id}`);
-      // Delete safe_transactions (safe_id is NOT NULL so can't be nulled)
       await tx.execute(sql`DELETE FROM safe_transactions WHERE safe_id = ${id}`);
 
       const result = await tx.delete(safes).where(eq(safes.id, id)).returning();
