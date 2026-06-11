@@ -2084,7 +2084,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Safe not found" });
       }
       res.json({ message: "Safe deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
+      const msg = error?.message || "";
+      if (msg.includes("foreign key") || msg.includes("violates") || msg.includes("referenced")) {
+        return res.status(400).json({ message: "safeHasTransactions" });
+      }
       res.status(500).json({ message: "Failed to delete safe" });
     }
   });

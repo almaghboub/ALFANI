@@ -299,8 +299,12 @@ export default function Finance() {
 
   const deleteSafeMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest("DELETE", `/api/safes/${id}`);
-      return response.json();
+      const response = await fetch(`/api/safes/${id}`, { method: "DELETE", credentials: "include" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.message || "failedToDeleteSafe");
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/safes"] });
@@ -309,8 +313,10 @@ export default function Finance() {
       setSafeToDelete(null);
       toast({ title: t("deleted") || "Deleted", description: t("safeDeleted") || "Safe deleted successfully" });
     },
-    onError: () => {
-      toast({ title: t("error") || "Error", description: t("failedToDeleteSafe") || "Failed to delete safe", variant: "destructive" });
+    onError: (error: Error) => {
+      const msgKey = error.message || "failedToDeleteSafe";
+      const translated = t(msgKey) || t("failedToDeleteSafe") || "Failed to delete safe";
+      toast({ title: t("error") || "Error", description: translated, variant: "destructive" });
     },
   });
 
