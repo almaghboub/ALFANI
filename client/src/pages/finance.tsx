@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/components/auth-provider";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -89,6 +90,8 @@ interface InvoiceMetrics {
 export default function Finance() {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isOwner = user?.role === 'owner';
   const isRTL = i18n.language === "ar";
   const [currencyMode, setCurrencyMode] = useState<CurrencyMode>("USD");
   const [activeTab, setActiveTab] = useState("safes");
@@ -529,6 +532,7 @@ export default function Finance() {
           ) : (
           <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {isOwner && (
             <Card data-testid="card-safe-balance">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -547,7 +551,9 @@ export default function Finance() {
                 </p>
               </CardContent>
             </Card>
+            )}
 
+            {isOwner && (
             <Card data-testid="card-bank-balance">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -566,6 +572,7 @@ export default function Finance() {
                 </p>
               </CardContent>
             </Card>
+            )}
 
             <Card data-testid="card-customer-debt">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -738,10 +745,12 @@ export default function Finance() {
                           <p className="font-medium">{safe.name}</p>
                           <p className="text-xs text-muted-foreground">{safe.code}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-primary">{formatCurrency(safe.balanceUSD, "USD")}</p>
-                          <p className="text-xs text-blue-600 font-medium">{formatCurrency(safe.balanceLYD, "LYD")}</p>
-                        </div>
+                        {isOwner && (
+                          <div className="text-right">
+                            <p className="font-bold text-primary">{formatCurrency(safe.balanceUSD, "USD")}</p>
+                            <p className="text-xs text-blue-600 font-medium">{formatCurrency(safe.balanceLYD, "LYD")}</p>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -772,10 +781,12 @@ export default function Finance() {
                           <p className="font-medium">{bank.name}</p>
                           <p className="text-xs text-muted-foreground">{bank.code}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-blue-600">{formatCurrency(bank.balanceUSD, "USD")}</p>
-                          <p className="text-xs text-blue-600 font-medium">{formatCurrency(bank.balanceLYD, "LYD")}</p>
-                        </div>
+                        {isOwner && (
+                          <div className="text-right">
+                            <p className="font-bold text-blue-600">{formatCurrency(bank.balanceUSD, "USD")}</p>
+                            <p className="text-xs text-blue-600 font-medium">{formatCurrency(bank.balanceLYD, "LYD")}</p>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -904,8 +915,8 @@ export default function Finance() {
                     <TableRow>
                       <TableHead>{t("name") || "Name"}</TableHead>
                       <TableHead>{t("code") || "Code"}</TableHead>
-                      <TableHead>{t("balanceUSD") || "Balance (USD)"}</TableHead>
-                      <TableHead>{t("balanceLYD") || "Balance (LYD)"}</TableHead>
+                      {isOwner && <TableHead>{t("balanceUSD") || "Balance (USD)"}</TableHead>}
+                      {isOwner && <TableHead>{t("balanceLYD") || "Balance (LYD)"}</TableHead>}
                       <TableHead>{t("status") || "Status"}</TableHead>
                       <TableHead>{t("actions") || "Actions"}</TableHead>
                     </TableRow>
@@ -915,8 +926,8 @@ export default function Finance() {
                       <TableRow key={safe.id} data-testid={`safe-row-${safe.id}`}>
                         <TableCell className="font-medium">{safe.name}</TableCell>
                         <TableCell>{safe.code}</TableCell>
-                        <TableCell className="font-bold text-primary">{formatCurrency(safe.balanceUSD, "USD")}</TableCell>
-                        <TableCell className="font-bold text-blue-600">{formatCurrency(safe.balanceLYD, "LYD")}</TableCell>
+                        {isOwner && <TableCell className="font-bold text-primary">{formatCurrency(safe.balanceUSD, "USD")}</TableCell>}
+                        {isOwner && <TableCell className="font-bold text-blue-600">{formatCurrency(safe.balanceLYD, "LYD")}</TableCell>}
                         <TableCell>
                           <Badge variant={safe.isActive ? "default" : "secondary"}>
                             {safe.isActive ? t("active") || "Active" : t("inactive") || "Inactive"}
@@ -1185,8 +1196,8 @@ export default function Finance() {
                       <TableHead>{t("name") || "Name"}</TableHead>
                       <TableHead>{t("code") || "Code"}</TableHead>
                       <TableHead>{t("accountNumber") || "Account #"}</TableHead>
-                      <TableHead>{t("balanceUSD") || "Balance (USD)"}</TableHead>
-                      <TableHead>{t("balanceLYD") || "Balance (LYD)"}</TableHead>
+                      {isOwner && <TableHead>{t("balanceUSD") || "Balance (USD)"}</TableHead>}
+                      {isOwner && <TableHead>{t("balanceLYD") || "Balance (LYD)"}</TableHead>}
                       <TableHead>{t("linkedSafe") || "Linked Safe"}</TableHead>
                       <TableHead>{t("actions") || "Actions"}</TableHead>
                     </TableRow>
@@ -1197,8 +1208,8 @@ export default function Finance() {
                         <TableCell className="font-medium">{bank.name}</TableCell>
                         <TableCell>{bank.code}</TableCell>
                         <TableCell>{bank.accountNumber || "-"}</TableCell>
-                        <TableCell className="font-bold text-primary">{formatCurrency(bank.balanceUSD, "USD")}</TableCell>
-                        <TableCell className="font-bold text-blue-600">{formatCurrency(bank.balanceLYD, "LYD")}</TableCell>
+                        {isOwner && <TableCell className="font-bold text-primary">{formatCurrency(bank.balanceUSD, "USD")}</TableCell>}
+                        {isOwner && <TableCell className="font-bold text-blue-600">{formatCurrency(bank.balanceLYD, "LYD")}</TableCell>}
                         <TableCell>
                           {bank.linkedSafeId ? (
                             <Badge variant="outline">
@@ -1325,7 +1336,9 @@ export default function Finance() {
                       <SelectContent>
                         {safes.filter(s => s.isActive).map(safe => (
                           <SelectItem key={safe.id} value={safe.id}>
-                            {safe.name} (${parseFloat(String(safe.balanceUSD)).toFixed(2)} / {parseFloat(String(safe.balanceLYD)).toFixed(2)} LYD)
+                            {isOwner
+                              ? `${safe.name} ($${parseFloat(String(safe.balanceUSD)).toFixed(2)} / ${parseFloat(String(safe.balanceLYD)).toFixed(2)} LYD)`
+                              : safe.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
