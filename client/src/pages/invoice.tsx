@@ -1,6 +1,7 @@
 import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/components/auth-provider";
 import { Plus, Minus, Printer, Trash2, ShoppingCart, Wrench } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,8 @@ interface CartItem {
 export default function Invoice() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isOwner = user?.role === 'owner';
   const printRef = useRef<HTMLDivElement>(null);
   const [customerName, setCustomerName] = useState("");
   const [branch, setBranch] = useState<"ALFANI1" | "ALFANI2">("ALFANI1");
@@ -784,7 +787,7 @@ export default function Invoice() {
                   <SelectContent>
                     {safes.filter(s => s.isActive).map(safe => (
                       <SelectItem key={safe.id} value={safe.id}>
-                        {safe.name} ({Number(safe.balanceLYD).toFixed(2)} LYD)
+                        {isOwner ? `${safe.name} (${Number(safe.balanceLYD).toFixed(2)} LYD)` : safe.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
