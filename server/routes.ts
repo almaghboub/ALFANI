@@ -5,6 +5,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
 import { storage } from "./storage";
+import { PriceIncreaseService, PriceIncreaseError, priceIncreaseSchema } from "./price-increase";
 import { hashPassword, verifyPassword } from "./auth";
 import { requireAuth, requireOwner, requireOperational, requireDeliveryManager, requireShippingStaff, requireDeliveryAccess, requireProductManagement } from "./middleware";
 import { ObjectStorageService } from "./objectStorage";
@@ -1557,6 +1558,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============ PRODUCTS & INVENTORY ROUTES ============
+
+  const priceIncreases = new PriceIncreaseService(pool, () => storage.invalidateProductCaches());
+
+  app.get("/api/products/price-increase/categories", requireOwner, async (_req, res) => {
+    try {
+      res.json(await priceIncreases.categories());
+    } catch (error) {
+      console.error("Price increase categories error:", error);
+      res.status(500).json({ message: "Failed to load categories." });
+    }
+  });
+
+  app.post("/api/products/price-increase/preview", requireOwner, async (req, res) => {
+    const parsed = priceIncreaseSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Enter a positive percentage (up to 10000, with at most two decimal places) and a valid product selection." });
+    }
+    try {
+      res.json(await priceIncreases.preview(req.user!.id, parsed.data));
+    } catch (error) {
+      if (error instanceof PriceIncreaseError) return res.status(error.status).json({ message: error.message });
+      console.error("Price increase preview error:", error);
+      res.status(500).json({ message: "Could not preview prices. No prices were changed." });
+    }
+  });
+
+  app.post("/api/products/price-increase/apply", requireOwner, async (req, res) => {
+    if (typeof req.body?.token !== "string" || req.body.token.length > 100) {
+      return res.status(400).json({ message: "A valid price preview is required." });
+    }
+    try {
+      res.json(await priceIncreases.apply(req.user!.id, req.body.token));
+    } catch (error) {
+      if (error instanceof PriceIncreaseError) return res.status(error.status).json({ message: error.message });
+      console.error("Price increase apply error:", error);
+      res.status(500).json({ message: "Could not apply the price increase. Refresh and preview prices again before retrying." });
+    }
+  });
 
   // Products
   const canManageProducts = (role: string) => role === "owner" || role === "stock_manager";

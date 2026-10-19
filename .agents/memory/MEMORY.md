@@ -1,0 +1,1 @@
+- [Bulk price confirmation safety](bulk-price-safety.md) — price changes require fresh, single-use confirmation; fail closed rather than retry after ambiguous failures.

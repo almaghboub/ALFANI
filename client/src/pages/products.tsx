@@ -14,6 +14,7 @@ import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/components/auth-provider";
+import { BulkPriceIncrease } from "@/components/bulk-price-increase";
 import type { Product, InsertProduct } from "@shared/schema";
 
 interface ProductWithInventory extends Product {
@@ -386,12 +387,15 @@ export default function Products() {
             data-testid="input-search-products"
           />
         </div>
-        {canManage && (
-          <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-add-product">
-            <Plus className="h-4 w-4 mr-2" />
-            {t("addProduct")}
-          </Button>
-        )}
+        <div className="flex flex-col sm:flex-row gap-2">
+          {user?.role === "owner" && <BulkPriceIncrease />}
+          {canManage && (
+            <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-add-product">
+              <Plus className="h-4 w-4 mr-2" />
+              {t("addProduct")}
+            </Button>
+          )}
+        </div>
       </div>
 
       {user?.role === "owner" && productStats && (

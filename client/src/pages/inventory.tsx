@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Header } from "@/components/header";
 import { useAuth } from "@/components/auth-provider";
+import { BulkPriceIncrease } from "@/components/bulk-price-increase";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Product, BranchInventory, ProductWithInventory } from "@shared/schema";
@@ -328,6 +329,7 @@ export default function Inventory() {
             data-testid="input-search-inventory"
           />
         </div>
+        {isOwner && <BulkPriceIncrease />}
       </div>
 
       <Card>
