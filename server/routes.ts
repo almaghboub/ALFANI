@@ -1573,7 +1573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/products/price-increase/preview", requireOwner, async (req, res) => {
     const parsed = priceIncreaseSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: "Enter a positive percentage (up to 10000, with at most two decimal places) and a valid product selection." });
+      return res.status(400).json({ message: "Enter a nonzero percentage from -100 to 10000 (at most two decimal places) and a valid product selection. Decreases cannot exceed 100%." });
     }
     try {
       res.json(await priceIncreases.preview(req.user!.id, parsed.data));

@@ -17,8 +17,8 @@ interface PreviewResult { token: string; total: number; samples: PreviewSample[]
 interface PreviewContext { percentage: number; scope: Scope; category?: string; productIds?: string[]; }
 
 const copy = {
-  title: "Bulk selling price increase / زيادة جماعية لأسعار البيع",
-  percent: "Increase percentage / نسبة الزيادة",
+  title: "Bulk selling price adjustment / تعديل جماعي لأسعار البيع",
+  percent: "Percentage / النسبة المئوية",
   scope: "Apply to / نطاق التطبيق",
   all: "All products / كل المنتجات",
   category: "One category / فئة واحدة",
@@ -27,10 +27,10 @@ const copy = {
   search: "Search products / ابحث عن المنتجات",
   selectionCount: "selected / محدد",
   preview: "Review price changes / معاينة التغييرات",
-  confirmTitle: "Confirm price increase / تأكيد زيادة الأسعار",
+  confirmTitle: "Confirm price adjustment / تأكيد تعديل الأسعار",
   cancel: "Cancel / إلغاء",
   back: "Back / رجوع",
-  confirm: "Apply increase / تطبيق الزيادة",
+  confirm: "Apply price change / تطبيق تعديل الأسعار",
   count: "Products affected / عدد المنتجات",
   before: "Current / الحالي",
   after: "New price / السعر الجديد",
@@ -40,7 +40,7 @@ const copy = {
   noProducts: "No matching products / لا توجد منتجات مطابقة",
   retry: "Try again / إعادة المحاولة",
   success: "Selling prices updated / تم تحديث أسعار البيع",
-  invalidPercent: "Enter a percentage greater than 0 and no more than 10,000, with up to 2 decimal places. / أدخل نسبة أكبر من 0 ولا تتجاوز 10,000 وبحد أقصى منزلتين عشريتين.",
+  invalidPercent: "Enter a positive percentage with up to 2 decimals. Maximum decrease: 100%; maximum increase: 10,000%. / أدخل نسبة موجبة بحد أقصى منزلتين عشريتين. أقصى تخفيض: 100٪؛ أقصى زيادة: 10,000٪.",
   chooseCategory: "Choose a category first. / اختر فئة أولاً.",
   chooseProducts: "Select at least one product. / اختر منتجاً واحداً على الأقل.",
   scopeAll: "All products / كل المنتجات",
@@ -55,6 +55,7 @@ export function BulkPriceIncrease() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [percentage, setPercentage] = useState("");
+  const [direction, setDirection] = useState<"increase" | "decrease">("increase");
   const [scope, setScope] = useState<Scope>("all");
   const [category, setCategory] = useState("");
   const [search, setSearch] = useState("");
@@ -67,7 +68,8 @@ export function BulkPriceIncrease() {
   const requestLock = useRef(false);
   const busy = working;
   const percentageValue = Number(percentage);
-  const validPercentage = Number.isFinite(percentageValue) && percentageValue > 0 && percentageValue <= 10000 && /^\d+(\.\d{1,2})?$/.test(percentage);
+  const maxPercentage = direction === "decrease" ? 100 : 10000;
+  const validPercentage = Number.isFinite(percentageValue) && percentageValue > 0 && percentageValue <= maxPercentage && /^\d+(\.\d{1,2})?$/.test(percentage);
 
   const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError, refetch: refetchCategories } = useQuery<string[]>({
     queryKey: ["/api/products/price-increase/categories"],
@@ -97,6 +99,7 @@ export function BulkPriceIncrease() {
 
   const reset = () => {
     setPercentage("");
+    setDirection("increase");
     setScope("all");
     setCategory("");
     setSearch("");
@@ -141,7 +144,7 @@ export function BulkPriceIncrease() {
     setPreview(null);
     try {
       const context: PreviewContext = {
-        percentage: percentageValue,
+        percentage: direction === "decrease" ? -percentageValue : percentageValue,
         scope,
         ...(scope === "category" ? { category } : {}),
         ...(scope === "selected" ? { productIds: Array.from(selectedIds) } : {}),
@@ -200,7 +203,7 @@ export function BulkPriceIncrease() {
     <>
       <Button variant="outline" onClick={() => setOpen(true)} className="gap-2" data-testid="button-bulk-price-increase">
         <ArrowUpRight className="h-4 w-4" />
-        <span>Bulk price increase / زيادة جماعية</span>
+        <span>Bulk price adjustment / تعديل جماعي للأسعار</span>
       </Button>
       <Dialog open={open} onOpenChange={close}>
         <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-xl">
@@ -209,12 +212,29 @@ export function BulkPriceIncrease() {
             <DialogDescription>
               {confirming
                 ? "Review the price changes before applying them. / راجع تغييرات الأسعار قبل تطبيقها."
-                : "Set a positive percentage, then review a preview before any prices change. / حدد نسبة موجبة، ثم راجع المعاينة قبل تغيير الأسعار."}
+                : "Choose increase or decrease, enter a percentage, then review before applying. / اختر زيادة أو تخفيضاً، وأدخل النسبة، ثم راجع التغييرات قبل تطبيقها."}
             </DialogDescription>
           </DialogHeader>
 
           {!confirming ? (
             <div className="space-y-5 py-2">
+              <div className="grid gap-2">
+                <Label htmlFor="bulk-price-direction">Adjustment / نوع التعديل</Label>
+                <select
+                  id="bulk-price-direction"
+                  data-testid="select-bulk-price-direction"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={direction}
+                  disabled={busy}
+                  onChange={(event) => {
+                    setDirection(event.target.value as "increase" | "decrease");
+                    invalidatePreview();
+                  }}
+                >
+                  <option value="increase">Increase prices / زيادة الأسعار</option>
+                  <option value="decrease">Decrease prices / تخفيض الأسعار</option>
+                </select>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="bulk-price-percent">{copy.percent}</Label>
                 <div className="relative">
@@ -222,7 +242,7 @@ export function BulkPriceIncrease() {
                     id="bulk-price-percent"
                     type="number"
                     min="0.01"
-                    max="10000"
+                    max={maxPercentage}
                     step="0.01"
                     inputMode="decimal"
                     placeholder="e.g. 12.5"
@@ -233,7 +253,10 @@ export function BulkPriceIncrease() {
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
                 </div>
-                <p className="text-xs text-muted-foreground">0.01–10,000 · up to 2 decimals / حتى منزلتين عشريتين</p>
+                <p className="text-xs text-muted-foreground">0.01–{maxPercentage.toLocaleString()}% · up to 2 decimals / حتى منزلتين عشريتين</p>
+                {direction === "decrease" && percentageValue === 100 && (
+                  <p className="text-sm text-destructive">A 100% decrease sets selling prices to 0 LYD. / تخفيض 100٪ يجعل أسعار البيع 0 د.ل.</p>
+                )}
               </div>
 
               <fieldset className="grid gap-2">
@@ -362,7 +385,13 @@ export function BulkPriceIncrease() {
                 <div className="rounded-lg border bg-muted/30 p-3">
                   <p className="text-xs text-muted-foreground">{copy.scope}</p>
                   <p className="mt-1 text-sm font-semibold">{scopeName}</p>
-                  <p className="text-xs text-muted-foreground">+{previewContext?.percentage}%</p>
+                  <p className="text-sm font-medium">
+                    {(previewContext?.percentage ?? 0) < 0 ? "Decrease / تخفيض" : "Increase / زيادة"}
+                    {" "}{(previewContext?.percentage ?? 0) > 0 ? "+" : ""}{previewContext?.percentage}%
+                  </p>
+                  {previewContext?.percentage === -100 && (
+                    <p className="text-sm text-destructive">Selling prices will become 0 LYD. / ستصبح أسعار البيع 0 د.ل.</p>
+                  )}
                 </div>
               </div>
               <div className="rounded-md border border-amber-300/70 bg-amber-50/70 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">

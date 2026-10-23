@@ -4,10 +4,10 @@ import pg from "pg";
 import { PriceIncreaseService, priceIncreaseSchema } from "./price-increase";
 
 test("percentage and selection validation", () => {
-  for (const percentage of [0, -10, Infinity, NaN, 10001, 0.001, "10"]) {
+  for (const percentage of [0, -100.01, -101, Infinity, NaN, 10001, 0.001, -0.001, "10"]) {
     assert.equal(priceIncreaseSchema.safeParse({ scope: "all", percentage }).success, false);
   }
-  for (const percentage of [0.01, 5, 10, 20, 12.5, 10000]) {
+  for (const percentage of [-100, -99.99, -12.5, -10, -0.01, 0.01, 5, 10, 20, 12.5, 10000]) {
     assert.equal(priceIncreaseSchema.safeParse({ scope: "all", percentage }).success, true);
   }
   assert.equal(priceIncreaseSchema.safeParse({ scope: "selected", percentage: 10, productIds: [] }).success, false);
@@ -63,6 +63,45 @@ test("PostgreSQL bulk increase safety", { skip: !process.env.DATABASE_URL }, asy
         [{ product_id: "a", unit_price: "100" }, { product_id: "b", unit_price: "9.99" }]);
       await assert.rejects(service.apply("owner", preview.token), /already applied/);
       assert.equal(invalidations, 1);
+    });
+    await t.test("all products decrease: 100 minus 10% = 90; other fields and history unchanged", async () => {
+      await reset();
+      const before = (await query("SELECT to_jsonb(p) - 'price' AS data FROM products p ORDER BY id")).rows;
+      const inventoryBefore = (await query("SELECT * FROM price_test_inventory ORDER BY product_id")).rows;
+      const invoicesBefore = (await query("SELECT * FROM price_test_invoices ORDER BY product_id")).rows;
+      const preview = await service.preview("owner", priceIncreaseSchema.parse({ scope: "all", percentage: -10 }));
+      assert.equal(preview.total, 4);
+      assert.equal(preview.samples[0].newPrice, "90.00");
+      assert.equal((await query("SELECT price FROM products WHERE id='a'")).rows[0].price, "100.00");
+      assert.deepEqual(await service.apply("owner", preview.token), { updatedCount: 4 });
+      assert.deepEqual((await query("SELECT price FROM products ORDER BY id")).rows.map(r => r.price),
+        ["90.00", "8.99", "18.00", "0.00"]);
+      assert.deepEqual((await query("SELECT to_jsonb(p) - 'price' AS data FROM products p ORDER BY id")).rows, before);
+      assert.deepEqual((await query("SELECT * FROM price_test_inventory ORDER BY product_id")).rows, inventoryBefore);
+      assert.deepEqual((await query("SELECT * FROM price_test_invoices ORDER BY product_id")).rows, invoicesBefore);
+      await assert.rejects(service.apply("owner", preview.token), /already applied/);
+    });
+    await t.test("category decrease uses current prices and leaves other categories unchanged", async () => {
+      await reset();
+      for (const percentage of [-20, -10]) {
+        const preview = await service.preview("owner", { scope: "category", category: "A", percentage });
+        assert.equal(preview.total, 2);
+        await service.apply("owner", preview.token);
+      }
+      assert.deepEqual((await query("SELECT price FROM products ORDER BY id")).rows.map(r => r.price),
+        ["72.00", "7.19", "20.00", "0.00"]);
+    });
+    await t.test("selected fractional decrease and 100% floor to zero", async () => {
+      await reset();
+      let preview = await service.preview("owner", { scope: "selected", productIds: ["a", "c"], percentage: -12.5 });
+      await service.apply("owner", preview.token);
+      assert.deepEqual((await query("SELECT price FROM products ORDER BY id")).rows.map(r => r.price),
+        ["87.50", "9.99", "17.50", "0.00"]);
+      preview = await service.preview("owner", { scope: "selected", productIds: ["a", "z"], percentage: -100 });
+      await service.apply("owner", preview.token);
+      assert.deepEqual((await query("SELECT price FROM products ORDER BY id")).rows.map(r => r.price),
+        ["0.00", "9.99", "17.50", "0.00"]);
+      await assert.rejects(service.apply("owner", preview.token), /already applied/);
     });
     await t.test("category applies only to that category and uses current prices", async () => {
       await reset();

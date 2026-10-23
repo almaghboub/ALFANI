@@ -13,7 +13,8 @@ export const priceIncreaseSchema = z.discriminatedUnion("scope", [
 ]);
 
 function percentageSchema() {
-  return z.number().finite().positive().max(10000)
+  return z.number().finite().min(-100).max(10000)
+    .refine(value => value !== 0, "Percentage must not be zero")
     .refine(value => Math.abs(value * 100 - Math.round(value * 100)) < 0.000001,
       "Use at most two decimal places");
 }
@@ -65,8 +66,8 @@ export class PriceIncreaseService {
     }
     if (rows.some(row => row.price === null || row.new_price === null ||
       !Number.isFinite(Number(row.price)) || !Number.isFinite(Number(row.new_price)) ||
-      Number(row.price) < 0 || Number(row.new_price) > 99999999.99)) {
-      throw new PriceIncreaseError("Some products have missing, invalid, or excessive prices. Correct them before increasing prices.");
+      Number(row.price) < 0 || Number(row.new_price) < 0 || Number(row.new_price) > 99999999.99)) {
+      throw new PriceIncreaseError("Some products have missing, invalid, or excessive prices. Correct them before adjusting prices.");
     }
     return rows;
   }
